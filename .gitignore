@@ -1,0 +1,64 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyCharm
+.idea/
+*.iml
+
+# Testing and analysis
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Generated results
+*.xlsx
+*.xhtml
+*.xlsm
+*.xltx
+*.xltm
+*.xlsb
+*.ods
+*.numbers
+~$*.xlsx
+~$*.xls
+
+# Data Science formats (DataFrames & Big Data)
+*.parquet
+*.pickle
+*.pkl
+*.feather
+*.h5
+*.hdf5
+
+# Local SQL databases
+*.db
+*.sqlite
+*.sqlite3
+
+*.csv
+
+# Generated project archives
+*.zip

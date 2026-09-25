@@ -7,13 +7,13 @@ from energy_asset_hub.domain.validation.validation_result import ValidationResul
 
 
 class BessTelemetryPayloadValidator:
-    """Validates the structure and field types of a Bees API payload."""
+    """Validates the structure, field types, and values of a BESS API payload."""
     _REQUIRED_FIELDS: dict[str, tuple[type, ...]] = {
         "asset_id": (str,),
-        "timestamp":(str,),
-        "soc_percent":(int, float),
+        "timestamp": (str,),
+        "soc_percent": (int, float),
         "power_kw": (int, float),
-        "temperature_c":(int, float),
+        "temperature_c": (int, float),
     }
 
     def validate(self, data: object) -> ValidationResult:
@@ -22,18 +22,19 @@ class BessTelemetryPayloadValidator:
         if not isinstance(data, dict):
             issues.append(
                 ValidationIssue(
-                    field_name = None,
-                    code = ValidationIssueCode.INVALID_TYPE,
-                    severity = IssueSeverity.ERROR,
-                    message = "The API payload must be a JSON object",
-                    actual_value = data,
-                    expected = "dict",
+                    field_name=None,
+                    code=ValidationIssueCode.INVALID_TYPE,
+                    severity=IssueSeverity.ERROR,
+                    message="The API payload must be a JSON object",
+                    actual_value=data,
+                    expected="dict",
                 )
             )
 
             return ValidationResult(
-                issues = tuple(issues),
+                issues=tuple(issues),
             )
+
         for field_name, expected_types in self._REQUIRED_FIELDS.items():
             if field_name not in data:
                 issues.append(
@@ -61,7 +62,19 @@ class BessTelemetryPayloadValidator:
                         message=f"Field {field_name} has an invalid type",
                         actual_value=actual_value,
                         expected=self._format_expected_types(expected_types),
+                    )
+                )
+                continue
 
+            if field_name == "soc_percent" and not 0 <= actual_value <= 100:
+                issues.append(
+                    ValidationIssue(
+                        field_name="soc_percent",
+                        code=ValidationIssueCode.VALUE_OUT_OF_RANGE,
+                        severity=IssueSeverity.ERROR,
+                        message="Field soc_percent is outside the allowed range",
+                        actual_value=actual_value,
+                        expected="0 <= soc_percent <= 100",
                     )
                 )
 

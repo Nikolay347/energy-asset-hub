@@ -5,6 +5,7 @@ from energy_asset_hub.domain.validation.enums import (
     IssueSeverity,
     ValidationIssueCode,
 )
+import pytest
 
 
 def test_valid_payload_has_no_issues():
@@ -120,4 +121,56 @@ def test_multiple_validation_issues_are_collected():
 
     assert soc_issue.code is ValidationIssueCode.INVALID_TYPE
     assert soc_issue.severity is IssueSeverity.ERROR
+
+
+@pytest.mark.parametrize(
+    "soc_percent",
+    [-0.1, 100.1],
+)
+def test_soc_out_of_range_returns_issue(soc_percent):
+    validator = BessTelemetryPayloadValidator()
+
+    data = {
+        "asset_id": "BESS-01",
+        "timestamp": "2026-09-25T08:00:00Z",
+        "soc_percent": soc_percent,
+        "power_kw": -120.0,
+        "temperature_c": 28.4,
+    }
+
+    result = validator.validate(data)
+
+    assert result.is_valid is False
+    assert len(result.issues) == 1
+
+    issue = result.issues[0]
+
+    assert issue.field_name == "soc_percent"
+    assert issue.code is ValidationIssueCode.VALUE_OUT_OF_RANGE
+    assert issue.severity is IssueSeverity.ERROR
+
+
+@pytest.mark.parametrize(
+    "soc_percent",
+    [0, 100],
+)
+def test_soc_boundary_values_are_valid(soc_percent):
+    validator = BessTelemetryPayloadValidator()
+
+    data = {
+        "asset_id": "BESS-01",
+        "timestamp": "2026-09-25T08:00:00Z",
+        "soc_percent": soc_percent,
+        "power_kw": -120.0,
+        "temperature_c": 28.4,
+    }
+
+    result = validator.validate(data)
+
+    assert result.is_valid is True
+    assert result.issues == ()
+
+
+
+
 

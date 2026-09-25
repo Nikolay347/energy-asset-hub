@@ -43,3 +43,22 @@ data sources.
 
 The bess_api package is currently used for integration-related logic associated with Battery Energy 
 Storage System telemetry.
+
+
+## Testing
+
+Automated testing is developed in parallel with the project functionality. As the project grows and 
+new components are implemented, the test suite is extended to cover their expected behavior.
+
+The project uses pytest for automated testing.
+
+Currently, tests for BessTelemetryPayloadValidator cover:
+* valid telemetry payloads;
+* missing required fields;
+* invalid field types;
+* rejection of bool values for numeric fields;
+* collection of multiple validation issues in a single validation pass.
+
+Run the current payload validator tests with:
+
+python -m pytest tests/integrations/bess_api/test_payload_validator.py -v

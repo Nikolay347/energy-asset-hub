@@ -14,10 +14,15 @@ class IssueSeverity(Enum):
 class ValidationIssueCode(Enum):
     MISSING_FIELD = (1001, "missing_field")
     INVALID_TYPE = (1002, "invalid_type")
+
     VALUE_OUT_OF_RANGE = (2001, "value_out_of_range")
     UNIT_MISMATCH = (2002, "unit_mismatch")
+
     STALE_DATA = (3001, "stale_data")
     FUTURE_TIMESTAMP = (3002, "future_timestamp")
+    INVALID_TIMESTAMP_FORMAT = (3003, "invalid_timestamp_format")
+    TIMEZONE_REQUIRED = (3004, "timezone_required")
+
 
     def __init__(
             self,

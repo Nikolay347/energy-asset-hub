@@ -12,7 +12,7 @@ def test_valid_payload_has_no_issues():
     validator = BessTelemetryPayloadValidator()
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": 72.5,
         "power_kw": -120.0,
         "temperature_c": 28.4,
@@ -28,7 +28,7 @@ def test_missing_temperature_field_returns_issue():
 
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": 72.5,
         "power_kw": -120.0,
     }
@@ -51,7 +51,7 @@ def test_invalid_soc_type_returns_issue():
 
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": "72.5",
         "power_kw": -120.0,
         "temperature_c": 28.4,
@@ -74,7 +74,7 @@ def test_bool_soc_value_returns_invalid_type_issue():
 
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": True,
         "power_kw": -120.0,
         "temperature_c": 28.4,
@@ -132,7 +132,7 @@ def test_soc_out_of_range_returns_issue(soc_percent):
 
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": soc_percent,
         "power_kw": -120.0,
         "temperature_c": 28.4,
@@ -159,7 +159,7 @@ def test_soc_boundary_values_are_valid(soc_percent):
 
     data = {
         "asset_id": "BESS-01",
-        "timestamp": "2026-09-25T08:00:00Z",
+        "timestamp": "2026-09-25T08:00:00+03:00",
         "soc_percent": soc_percent,
         "power_kw": -120.0,
         "temperature_c": 28.4,
@@ -171,6 +171,49 @@ def test_soc_boundary_values_are_valid(soc_percent):
     assert result.issues == ()
 
 
+def test_invalid_timestamp_format_returns_issue():
+    validator = BessTelemetryPayloadValidator()
+
+    data = {
+        "asset_id": "BESS-01",
+        "timestamp": "not-a-timestamp",
+        "soc_percent": 72.5,
+        "power_kw": -120.0,
+        "temperature_c": 28.4,
+    }
+
+    result = validator.validate(data)
+
+    assert result.is_valid is False
+    assert len(result.issues) == 1
+
+    issue = result.issues[0]
+
+    assert issue.field_name == "timestamp"
+    assert issue.code is ValidationIssueCode.INVALID_TIMESTAMP_FORMAT
+    assert issue.severity is IssueSeverity.ERROR
 
 
+
+def test_timestamp_without_timezone_returns_issue():
+    validator = BessTelemetryPayloadValidator()
+
+    data = {
+        "asset_id": "BESS-01",
+        "timestamp": "2026-09-27T21:30:00",
+        "soc_percent": 72.5,
+        "power_kw": -120.0,
+        "temperature_c": 28.4,
+    }
+
+    result = validator.validate(data)
+
+    assert result.is_valid is False
+    assert len(result.issues) == 1
+
+    issue = result.issues[0]
+
+    assert issue.field_name == "timestamp"
+    assert issue.code is ValidationIssueCode.TIMEZONE_REQUIRED
+    assert issue.severity is IssueSeverity.ERROR
 

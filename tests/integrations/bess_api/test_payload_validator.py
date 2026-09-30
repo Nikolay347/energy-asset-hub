@@ -195,7 +195,7 @@ def test_invalid_timestamp_format_returns_issue():
 
 
 
-def test_timestamp_without_timezone_returns_issue():
+def test_timestamp_without_timezone_is_accepted():
     validator = BessTelemetryPayloadValidator()
 
     data = {
@@ -203,17 +203,12 @@ def test_timestamp_without_timezone_returns_issue():
         "timestamp": "2026-09-27T21:30:00",
         "soc_percent": 72.5,
         "power_kw": -120.0,
-        "temperature_c": 28.4,
+        "temperature_c": 28.3,
     }
 
     result = validator.validate(data)
 
-    assert result.is_valid is False
-    assert len(result.issues) == 1
+    assert result.is_valid
+    assert result.issues == ()
 
-    issue = result.issues[0]
-
-    assert issue.field_name == "timestamp"
-    assert issue.code is ValidationIssueCode.TIMEZONE_REQUIRED
-    assert issue.severity is IssueSeverity.ERROR
 

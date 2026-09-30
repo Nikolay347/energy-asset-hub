@@ -70,8 +70,7 @@ class BessTelemetryPayloadValidator:
 
             if field_name == "timestamp":
                 try:
-                    parsed_timestamp = datetime.fromisoformat(actual_value)
-
+                    datetime.fromisoformat(actual_value)
                 except ValueError:
                     issues.append(
                         ValidationIssue(
@@ -83,19 +82,6 @@ class BessTelemetryPayloadValidator:
                             expected="ISO 8601 timestamp",
                         )
                     )
-
-                else:
-                    if parsed_timestamp.tzinfo is None:
-                        issues.append(
-                            ValidationIssue(
-                                field_name="timestamp",
-                                code=ValidationIssueCode.TIMEZONE_REQUIRED,
-                                severity=IssueSeverity.ERROR,
-                                message="Field timestamp does not contain timezone information",
-                                actual_value=actual_value,
-                                expected="Timestamp with timezone information",
-                            )
-                        )
 
             if field_name == "soc_percent" and not 0 <= actual_value <= 100:
                 issues.append(

@@ -22,6 +22,9 @@ class ValidationIssueCode(Enum):
     FUTURE_TIMESTAMP = (3002, "future_timestamp")
     INVALID_TIMESTAMP_FORMAT = (3003, "invalid_timestamp_format")
     TIMEZONE_REQUIRED = (3004, "timezone_required")
+    AMBIGUOUS_LOCAL_TIME = (3005, "ambiguous_local_time")
+    NONEXISTENT_LOCAL_TIME = (3006, "nonexistent_local_time")
+    INVALID_SOURCE_TIMEZONE = (3007, "invalid_source_timezone")
 
 
     def __init__(

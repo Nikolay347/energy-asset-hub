@@ -91,6 +91,25 @@ It:
 The current processor operates on supplied Python dictionaries. Communication with 
 real BESS devices is not yet implemented.
 
+### Measurement Domain Model
+
+`Measurement` is a reusable domain model representing a single
+operational parameter of an energy asset.
+
+Each measurement contains:
+
+- Asset and data source identifiers.
+- Parameter name, numerical value, and measurement unit.
+- A timezone-aware UTC timestamp.
+
+The model enforces basic data integrity:
+
+- Only integer and floating-point values are accepted.
+- Boolean values, NaN, and infinities are rejected.
+- Timestamps must have a zero UTC offset.
+
+Equipment-specific physical validation is planned separately.
+
 ### Timezone Database Check
 
 TimezoneDatabaseCheck provides a basic diagnostic check for the availability of selected 
@@ -107,6 +126,7 @@ The Python package is organized into domain and integration layers.
 energy_asset_hub/
 ├── domain/
 │   ├── models/
+│   │   └── measurement.py
 │   ├── time/
 │   │   ├── timestamp_normalizer.py
 │   │   └── timezone_database_check.py
@@ -164,11 +184,10 @@ python -m pytest tests/integrations/bess_api/test_telemetry_processor.py -v
 
 The next development stages include:
 
-1. Implementing the Measurement domain model.
-2. Transforming validated BESS telemetry into internal measurements.
-3. Preserving raw telemetry packets and their diagnostic results.
-4. Supporting reprocessing of stored raw packets after correcting source configuration, without requesting 
-5. the same telemetry again.
+1. Transforming validated BESS telemetry into internal measurements.
+2. Preserving raw telemetry packets and their diagnostic results.
+3. Supporting reprocessing of stored raw packets after correcting source configuration, without requesting 
+4. the same telemetry again.
 5. Implementing measurement history storage and retrieval.
 6. Adding real communication interfaces for energy assets.
 7. Supporting multiple data sources and redundant communication channels.

@@ -56,6 +56,7 @@ def test_invalid_payload_is_not_normalized():
         and issue.field_name == "timestamp"
         for issue in result.validation_result.issues
     )
+    assert result.validated_payload is None
 
 
 def test_missing_source_timezone_returns_validation_issue():
@@ -198,3 +199,26 @@ def test_timestamp_offset_takes_priority_over_source_timezone():
     assert result.validation_result.is_valid
     assert result.validation_result.issues == ()
     assert result.timestamp_utc == expected_timestamp
+
+
+def test_processing_result_preserves_validated_payload_snapshot():
+    data = {
+        "asset_id": "BESS-01",
+        "timestamp": "2026-09-30T12:00:00+03:00",
+        "soc_percent": 72.5,
+        "power_kw": -120.0,
+        "temperature_c": 28.3,
+    }
+
+    processor = BessTelemetryProcessor()
+
+    result = processor.process(data)
+
+    assert result.validation_result.is_valid
+
+    assert result.validated_payload.asset_id == "BESS-01"
+    assert result.validated_payload.soc_percent == 72.5
+
+    data["soc_percent"] = 95.0
+
+    assert result.validated_payload.soc_percent == 72.5

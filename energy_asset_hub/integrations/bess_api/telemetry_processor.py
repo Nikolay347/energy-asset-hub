@@ -24,6 +24,14 @@ from energy_asset_hub.domain.validation.validation_issue import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class ValidatedBessPayload:
+    asset_id: str
+    raw_timestamp: str
+    soc_percent: float
+    power_kw: float
+    temperature_c: float
+
 
 @dataclass(frozen=True, slots=True)
 class BessTelemetryProcessingResult:
@@ -31,6 +39,7 @@ class BessTelemetryProcessingResult:
 
     validation_result: ValidationResult
     timestamp_utc: datetime | None
+    validated_payload: ValidatedBessPayload | None = None
 
 
 class BessTelemetryProcessor:
@@ -114,7 +123,18 @@ class BessTelemetryProcessor:
                 timestamp_utc=None,
             )
 
+#
+        validated_payload = ValidatedBessPayload(
+            asset_id=data["asset_id"],
+            raw_timestamp=data["timestamp"],
+            soc_percent=data["soc_percent"],
+            power_kw=data["power_kw"],
+            temperature_c=data["temperature_c"],
+        )
+
+
         return BessTelemetryProcessingResult(
             validation_result=validation_result,
             timestamp_utc=timestamp_utc,
+            validated_payload=validated_payload,
         )

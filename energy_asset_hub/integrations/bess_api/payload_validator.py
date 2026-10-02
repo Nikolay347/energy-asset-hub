@@ -27,7 +27,7 @@ class BessTelemetryPayloadValidator:
                     field_name=None,
                     code=ValidationIssueCode.INVALID_TYPE,
                     severity=IssueSeverity.ERROR,
-                    message="The API payload must be a JSON object",
+                    message="The normalized telemetry payload must be a dictionary",
                     actual_value=data,
                     expected="dict",
                 )

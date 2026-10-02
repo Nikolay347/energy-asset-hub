@@ -7,6 +7,10 @@ from energy_asset_hub.domain.validation.enums import (
     ValidationIssueCode,
 )
 
+from energy_asset_hub.domain.models.normalized_telemetry_packet import (
+    NormalizedTelemetryPacket,
+)
+
 
 def test_valid_payload_is_processed_with_source_timezone():
     processor = BessTelemetryProcessor()
@@ -222,3 +226,32 @@ def test_processing_result_preserves_validated_payload_snapshot():
     data["soc_percent"] = 95.0
 
     assert result.validated_payload.soc_percent == 72.5
+
+
+def test_processor_accepts_payload_from_normalized_telemetry_packet():
+    normalized_payload = {
+        "asset_id": "BESS-01",
+        "timestamp": "2026-10-02T12:00:00+03:00",
+        "soc_percent": 72.5,
+        "power_kw": -120.0,
+        "temperature_c": 28.3,
+    }
+
+    packet = NormalizedTelemetryPacket(
+        packet_id="PKT-0007",
+        source_id="BESS-01-API",
+        normalized_payload=normalized_payload,
+        received_at_utc=datetime(
+            2026, 10, 2, 9, 0, 5,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    processor = BessTelemetryProcessor()
+
+    result = processor.process(
+        packet.to_dict()
+    )
+
+    assert result.validation_result.is_valid
+    assert result.validated_payload is not None

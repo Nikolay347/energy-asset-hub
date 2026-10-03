@@ -23,14 +23,6 @@ class Measurement:
             )
 
         if (
-                not isinstance(self.timestamp_utc, datetime)
-                or self.timestamp_utc.utcoffset() != timedelta(0)
-        ):
-            raise ValueError(
-                "timestamp_utc must be a timezone-aware UTC datetime"
-            )
-
-        if (
                 isinstance(self.value, bool)
                 or not isinstance(self.value, (int, float))
         ):

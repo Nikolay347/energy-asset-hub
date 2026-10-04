@@ -5,7 +5,7 @@ from energy_asset_hub.domain.models.normalized_telemetry_packet import (
     NormalizedTelemetryPacket,
 )
 from energy_asset_hub.domain.repositories.normalized_telemetry_packet_repository import (
-    InMemoryNormalizedTelemetryPacketRepository,
+    InMemoryNormalizedTelemetryPacketRepository, NormalizedTelemetryPacketRepository
 )
 
 
@@ -511,4 +511,12 @@ def test_repository_time_range_returns_packets_sorted_by_received_at():
         packet_late,
     )
 
+
+def test_in_memory_repository_satisfies_repository_protocol():
+    repository = InMemoryNormalizedTelemetryPacketRepository()
+
+    assert isinstance(
+        repository,
+        NormalizedTelemetryPacketRepository,
+    )
 

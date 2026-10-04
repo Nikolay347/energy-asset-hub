@@ -1,7 +1,41 @@
 from datetime import datetime
+from typing import Protocol, runtime_checkable
 from energy_asset_hub.domain.models.normalized_telemetry_packet import (
     NormalizedTelemetryPacket,
 )
+
+
+@runtime_checkable
+class NormalizedTelemetryPacketRepository(Protocol):
+    def save(self, packet: NormalizedTelemetryPacket) -> None:
+        ...
+
+    def get(
+        self,
+        packet_id: str,
+    ) -> NormalizedTelemetryPacket | None:
+        ...
+
+    def find_by_source_id(
+        self,
+        source_id: str,
+    ) -> tuple[NormalizedTelemetryPacket, ...]:
+        ...
+
+    def find_by_received_at_range(
+        self,
+        start_utc: datetime,
+        end_utc: datetime,
+    ) -> tuple[NormalizedTelemetryPacket, ...]:
+        ...
+
+    def find_by_source_id_and_received_at_range(
+        self,
+        source_id: str,
+        start_utc: datetime,
+        end_utc: datetime,
+    ) -> tuple[NormalizedTelemetryPacket, ...]:
+        ...
 
 
 class InMemoryNormalizedTelemetryPacketRepository:

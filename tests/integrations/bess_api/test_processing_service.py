@@ -32,6 +32,7 @@ def test_service_returns_failed_attempt_and_no_measurements_for_invalid_packet()
     service = BessTelemetryProcessingService()
 
     result = service.process_packet(
+        attempt_id="ATT-0001",
         packet=packet,
         processed_at_utc=datetime(
             2026, 10, 2, 9, 30, 6,
@@ -42,6 +43,7 @@ def test_service_returns_failed_attempt_and_no_measurements_for_invalid_packet()
 
     assert result.attempt.status is ProcessingStatus.FAILED
     assert result.measurements == ()
+    assert result.attempt.attempt_id == "ATT-0001"
 
     assert any(
         issue.code is ValidationIssueCode.TIMEZONE_REQUIRED
@@ -69,6 +71,7 @@ def test_service_returns_successful_attempt_and_measurements_for_valid_packet():
     service = BessTelemetryProcessingService()
 
     result = service.process_packet(
+        attempt_id="ATT-0001",
         packet=packet,
         processed_at_utc=datetime(
             2026, 10, 2, 9, 30, 6,
@@ -115,6 +118,7 @@ def test_service_can_reprocess_same_packet_after_source_timezone_is_configured()
     service = BessTelemetryProcessingService()
 
     first_result = service.process_packet(
+        attempt_id="ATT-0001",
         packet=packet,
         processed_at_utc=datetime(
             2026, 10, 2, 9, 30, 6,
@@ -132,6 +136,7 @@ def test_service_can_reprocess_same_packet_after_source_timezone_is_configured()
     )
 
     second_result = service.process_packet(
+        attempt_id="ATT-0002",
         packet=packet,
         processed_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
@@ -151,3 +156,5 @@ def test_service_can_reprocess_same_packet_after_source_timezone_is_configured()
         == datetime(2026, 10, 2, 9, 30, tzinfo=timezone.utc)
         for measurement in second_result.measurements
     )
+    assert first_result.attempt.attempt_id == "ATT-0001"
+    assert second_result.attempt.attempt_id == "ATT-0002"

@@ -10,6 +10,7 @@ class ProcessingStatus(Enum):
 
 @dataclass(frozen=True, slots=True)
 class ProcessingAttempt:
+    attempt_id: str
     packet_id: str
     processed_at_utc: datetime
     status: ProcessingStatus

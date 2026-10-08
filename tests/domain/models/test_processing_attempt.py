@@ -23,6 +23,7 @@ def test_processing_attempt_stores_packet_id_and_processing_time():
     )
 
     attempt = ProcessingAttempt(
+        attempt_id="ATT-0001",
         packet_id="PKT-0007",
         processed_at_utc=processed_at_utc,
         status=ProcessingStatus.SUCCESS,
@@ -39,6 +40,7 @@ def test_processing_attempt_stores_status():
     )
 
     attempt = ProcessingAttempt(
+        attempt_id="ATT-0001",
         packet_id="PKT-0007",
         processed_at_utc=processed_at_utc,
         status=ProcessingStatus.FAILED,
@@ -58,6 +60,7 @@ def test_failed_processing_attempt_stores_diagnostics():
     )
 
     attempt = ProcessingAttempt(
+        attempt_id="ATT-0001",
         packet_id="PKT-0007",
         processed_at_utc=datetime(
             2026, 10, 2, 13, 30, 0,
@@ -78,6 +81,7 @@ def test_processing_attempt_stores_source_timezone_used():
     )
 
     attempt = ProcessingAttempt(
+        attempt_id="ATT-0001",
         packet_id="PKT-0007",
         processed_at_utc=processed_at_utc,
         status=ProcessingStatus.SUCCESS,
@@ -86,3 +90,20 @@ def test_processing_attempt_stores_source_timezone_used():
 
     assert attempt.source_timezone_used == "Europe/Kyiv"
 
+def test_processing_attempt_stores_attempt_id():
+    attempt = ProcessingAttempt(
+        attempt_id="attempt-001",
+        packet_id="packet-001",
+        processed_at_utc=datetime(
+            2026,
+            10,
+            7,
+            7,
+            0,
+            5,
+            tzinfo=timezone.utc,
+        ),
+        status=ProcessingStatus.SUCCESS,
+    )
+
+    assert attempt.attempt_id == "attempt-001"

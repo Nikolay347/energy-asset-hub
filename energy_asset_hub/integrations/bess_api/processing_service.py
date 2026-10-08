@@ -31,6 +31,7 @@ class BessTelemetryProcessingService:
 
     def process_packet(
         self,
+        attempt_id: str,
         packet: NormalizedTelemetryPacket,
         processed_at_utc: datetime,
         source_timezone: str | None,
@@ -41,6 +42,7 @@ class BessTelemetryProcessingService:
         )
 
         attempt = self._attempt_mapper.map(
+            attempt_id=attempt_id,
             packet_id=packet.packet_id,
             processing_result=processing_result,
             processed_at_utc=processed_at_utc,

@@ -9,6 +9,7 @@ from energy_asset_hub.domain.models.processing_attempt import (
 class BessProcessingAttemptMapper:
     def map(
         self,
+        attempt_id: str,
         packet_id: str,
         processing_result,
         processed_at_utc: datetime,
@@ -21,6 +22,7 @@ class BessProcessingAttemptMapper:
         )
 
         return ProcessingAttempt(
+            attempt_id=attempt_id,
             packet_id=packet_id,
             processed_at_utc=processed_at_utc,
             status=status,

@@ -44,6 +44,7 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
     )
 
     first_attempt = attempt_mapper.map(
+        attempt_id="ATT-0001",
         packet_id=packet.packet_id,
         processing_result=first_result,
         processed_at_utc=datetime(
@@ -67,6 +68,7 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
     )
 
     second_attempt = attempt_mapper.map(
+        attempt_id="ATT-0002",
         packet_id=packet.packet_id,
         processing_result=second_result,
         processed_at_utc=datetime(
@@ -79,6 +81,8 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
     assert second_attempt.status is ProcessingStatus.SUCCESS
     assert second_attempt.diagnostics == ()
     assert second_attempt.source_timezone_used == "Europe/Kyiv"
+    assert first_attempt.attempt_id == "ATT-0001"
+    assert second_attempt.attempt_id == "ATT-0002"
 
     measurements = measurement_mapper.map(
         processing_result=second_result,

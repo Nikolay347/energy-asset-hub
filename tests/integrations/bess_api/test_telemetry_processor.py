@@ -7,8 +7,8 @@ from energy_asset_hub.domain.validation.enums import (
     ValidationIssueCode,
 )
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 
 
@@ -228,8 +228,8 @@ def test_processing_result_preserves_validated_payload_snapshot():
     assert result.validated_payload.soc_percent == 72.5
 
 
-def test_processor_accepts_payload_from_normalized_telemetry_packet():
-    normalized_payload = {
+def test_processor_accepts_payload_from_ingress_telemetry_packet():
+    ingress_payload = {
         "asset_id": "BESS-01",
         "timestamp": "2026-10-02T12:00:00+03:00",
         "soc_percent": 72.5,
@@ -237,10 +237,10 @@ def test_processor_accepts_payload_from_normalized_telemetry_packet():
         "temperature_c": 28.3,
     }
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=datetime(
             2026, 10, 2, 9, 0, 5,
             tzinfo=timezone.utc,

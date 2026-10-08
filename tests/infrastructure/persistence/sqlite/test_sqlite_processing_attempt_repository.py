@@ -9,8 +9,8 @@ from energy_asset_hub.domain.models.processing_attempt import (
 from energy_asset_hub.infrastructure.persistence.sqlite.sqlite_processing_attempt_repository import (
     SQLiteProcessingAttemptRepository,
 )
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.infrastructure.persistence.sqlite.sqlite_telemetry_packet_repository import (
     SQLiteTelemetryPacketRepository,
@@ -119,10 +119,10 @@ def test_processing_attempt_can_reference_existing_packet():
     packet_repository = SQLiteTelemetryPacketRepository(connection)
     attempt_repository = SQLiteProcessingAttemptRepository(connection)
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "soc_percent": 72.5,
         },
         received_at_utc=datetime(

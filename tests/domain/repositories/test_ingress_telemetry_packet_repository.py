@@ -1,19 +1,19 @@
 import pytest
 from datetime import datetime, timezone
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
-from energy_asset_hub.domain.repositories.normalized_telemetry_packet_repository import (
-    InMemoryNormalizedTelemetryPacketRepository, NormalizedTelemetryPacketRepository
+from energy_asset_hub.domain.repositories.ingress_telemetry_packet_repository import (
+    InMemoryIngressTelemetryPacketRepository, IngressTelemetryPacketRepository
 )
 
 
 def test_repository_saves_and_returns_packet_by_id():
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -26,7 +26,7 @@ def test_repository_saves_and_returns_packet_by_id():
         ),
     )
 
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     repository.save(packet)
 
@@ -36,7 +36,7 @@ def test_repository_saves_and_returns_packet_by_id():
 
 
 def test_repository_returns_none_when_packet_is_not_found():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     packet = repository.get("UNKNOWN-PACKET")
 
@@ -44,10 +44,10 @@ def test_repository_returns_none_when_packet_is_not_found():
 
 
 def test_repository_rejects_different_packet_with_existing_packet_id():
-    first_packet = NormalizedTelemetryPacket(
+    first_packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -60,10 +60,10 @@ def test_repository_rejects_different_packet_with_existing_packet_id():
         ),
     )
 
-    conflicting_packet = NormalizedTelemetryPacket(
+    conflicting_packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 81.0,
@@ -76,7 +76,7 @@ def test_repository_rejects_different_packet_with_existing_packet_id():
         ),
     )
 
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     repository.save(first_packet)
 
@@ -85,10 +85,10 @@ def test_repository_rejects_different_packet_with_existing_packet_id():
 
 
 def test_repository_allows_saving_same_packet_again():
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -101,7 +101,7 @@ def test_repository_allows_saving_same_packet_again():
         ),
     )
 
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     repository.save(packet)
     repository.save(packet)
@@ -112,10 +112,10 @@ def test_repository_allows_saving_same_packet_again():
 
 
 def test_repository_allows_equivalent_packet_with_same_packet_id():
-    first_packet = NormalizedTelemetryPacket(
+    first_packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -128,10 +128,10 @@ def test_repository_allows_equivalent_packet_with_same_packet_id():
         ),
     )
 
-    second_packet = NormalizedTelemetryPacket(
+    second_packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -147,7 +147,7 @@ def test_repository_allows_equivalent_packet_with_same_packet_id():
     assert first_packet is not second_packet
     assert first_packet == second_packet
 
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     repository.save(first_packet)
     repository.save(second_packet)
@@ -158,12 +158,12 @@ def test_repository_allows_equivalent_packet_with_same_packet_id():
 
 
 def test_repository_returns_packets_for_source_id():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_1 = NormalizedTelemetryPacket(
+    packet_1 = IngressTelemetryPacket(
         packet_id="PKT-0001",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -176,10 +176,10 @@ def test_repository_returns_packets_for_source_id():
         ),
     )
 
-    packet_2 = NormalizedTelemetryPacket(
+    packet_2 = IngressTelemetryPacket(
         packet_id="PKT-0002",
         source_id="BESS-02-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-02",
             "timestamp": "2026-10-02T12:31:00",
             "soc_percent": 64.0,
@@ -192,10 +192,10 @@ def test_repository_returns_packets_for_source_id():
         ),
     )
 
-    packet_3 = NormalizedTelemetryPacket(
+    packet_3 = IngressTelemetryPacket(
         packet_id="PKT-0003",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:32:00",
             "soc_percent": 71.8,
@@ -218,7 +218,7 @@ def test_repository_returns_packets_for_source_id():
 
 
 def test_repository_returns_empty_tuple_when_source_id_is_not_found():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     packets = repository.find_by_source_id("UNKNOWN-SOURCE")
 
@@ -226,32 +226,32 @@ def test_repository_returns_empty_tuple_when_source_id_is_not_found():
 
 
 def test_repository_returns_packets_received_in_time_range():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_1 = NormalizedTelemetryPacket(
+    packet_1 = IngressTelemetryPacket(
         packet_id="PKT-0001",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 9, 30, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_2 = NormalizedTelemetryPacket(
+    packet_2 = IngressTelemetryPacket(
         packet_id="PKT-0002",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_3 = NormalizedTelemetryPacket(
+    packet_3 = IngressTelemetryPacket(
         packet_id="PKT-0003",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 30, 0,
             tzinfo=timezone.utc,
@@ -277,22 +277,22 @@ def test_repository_returns_packets_received_in_time_range():
 
 
 def test_repository_time_range_includes_boundary_packets():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_start = NormalizedTelemetryPacket(
+    packet_start = IngressTelemetryPacket(
         packet_id="PKT-START",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_end = NormalizedTelemetryPacket(
+    packet_end = IngressTelemetryPacket(
         packet_id="PKT-END",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 11, 0, 0,
             tzinfo=timezone.utc,
@@ -317,7 +317,7 @@ def test_repository_time_range_includes_boundary_packets():
 
 
 def test_repository_rejects_invalid_time_range():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     with pytest.raises(ValueError):
         repository.find_by_received_at_range(
@@ -332,42 +332,42 @@ def test_repository_rejects_invalid_time_range():
         )
 
 def test_repository_returns_packets_for_source_id_and_time_range():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_1 = NormalizedTelemetryPacket(
+    packet_1 = IngressTelemetryPacket(
         packet_id="PKT-0001",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 9, 30, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_2 = NormalizedTelemetryPacket(
+    packet_2 = IngressTelemetryPacket(
         packet_id="PKT-0002",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_3 = NormalizedTelemetryPacket(
+    packet_3 = IngressTelemetryPacket(
         packet_id="PKT-0003",
         source_id="BESS-02-API",
-        normalized_payload={"asset_id": "BESS-02"},
+        ingress_payload={"asset_id": "BESS-02"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 5, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_4 = NormalizedTelemetryPacket(
+    packet_4 = IngressTelemetryPacket(
         packet_id="PKT-0004",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 11, 0, 0,
             tzinfo=timezone.utc,
@@ -395,7 +395,7 @@ def test_repository_returns_packets_for_source_id_and_time_range():
 
 
 def test_repository_source_and_time_range_rejects_invalid_time_range():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     with pytest.raises(ValueError):
         repository.find_by_source_id_and_received_at_range(
@@ -412,32 +412,32 @@ def test_repository_source_and_time_range_rejects_invalid_time_range():
 
 
 def test_repository_returns_source_packets_sorted_by_received_at():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_late = NormalizedTelemetryPacket(
+    packet_late = IngressTelemetryPacket(
         packet_id="PKT-LATE",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 11, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_early = NormalizedTelemetryPacket(
+    packet_early = IngressTelemetryPacket(
         packet_id="PKT-EARLY",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 9, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_middle = NormalizedTelemetryPacket(
+    packet_middle = IngressTelemetryPacket(
         packet_id="PKT-MIDDLE",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
             tzinfo=timezone.utc,
@@ -458,32 +458,32 @@ def test_repository_returns_source_packets_sorted_by_received_at():
 
 
 def test_repository_time_range_returns_packets_sorted_by_received_at():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
-    packet_late = NormalizedTelemetryPacket(
+    packet_late = IngressTelemetryPacket(
         packet_id="PKT-LATE",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 30, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_early = NormalizedTelemetryPacket(
+    packet_early = IngressTelemetryPacket(
         packet_id="PKT-EARLY",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 9, 30, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    packet_middle = NormalizedTelemetryPacket(
+    packet_middle = IngressTelemetryPacket(
         packet_id="PKT-MIDDLE",
         source_id="BESS-01-API",
-        normalized_payload={"asset_id": "BESS-01"},
+        ingress_payload={"asset_id": "BESS-01"},
         received_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
             tzinfo=timezone.utc,
@@ -513,10 +513,10 @@ def test_repository_time_range_returns_packets_sorted_by_received_at():
 
 
 def test_in_memory_repository_satisfies_repository_protocol():
-    repository = InMemoryNormalizedTelemetryPacketRepository()
+    repository = InMemoryIngressTelemetryPacketRepository()
 
     assert isinstance(
         repository,
-        NormalizedTelemetryPacketRepository,
+        IngressTelemetryPacketRepository,
     )
 

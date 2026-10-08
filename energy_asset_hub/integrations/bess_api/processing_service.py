@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.domain.models.processing_attempt import ProcessingAttempt
 from energy_asset_hub.domain.models.measurement import Measurement
@@ -32,7 +32,7 @@ class BessTelemetryProcessingService:
     def process_packet(
         self,
         attempt_id: str,
-        packet: NormalizedTelemetryPacket,
+        packet: IngressTelemetryPacket,
         processed_at_utc: datetime,
         source_timezone: str | None,
     ) -> BessTelemetryProcessingServiceResult:

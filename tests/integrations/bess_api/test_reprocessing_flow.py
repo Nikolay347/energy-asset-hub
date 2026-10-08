@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.domain.models.processing_attempt import (
     ProcessingStatus,
@@ -19,10 +19,10 @@ from energy_asset_hub.integrations.bess_api.telemetry_processor import (
 
 
 def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,

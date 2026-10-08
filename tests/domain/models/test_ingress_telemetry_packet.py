@@ -1,13 +1,13 @@
 import pytest
 from datetime import datetime, timezone
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 
 
-def test_normalized_telemetry_packet_stores_normalized_data():
-    normalized_payload = {
+def test_ingress_telemetry_packet_stores_ingress_data():
+    ingress_payload = {
         "asset_id": "BESS-01",
         "timestamp": "2026-10-01T12:00:00",
         "soc_percent": 72.5,
@@ -20,21 +20,21 @@ def test_normalized_telemetry_packet_stores_normalized_data():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0001",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
     assert packet.packet_id == "PKT-0001"
     assert packet.source_id == "BESS-01-API"
-    assert packet.normalized_payload == normalized_payload
+    assert packet.ingress_payload == ingress_payload
     assert packet.received_at_utc == received_at
 
 
-def test_normalized_packet_preserves_payload_snapshot():
-    normalized_payload = {
+def test_ingress_packet_preserves_payload_snapshot():
+    ingress_payload = {
         "asset_id": "BESS-01",
         "soc_percent": 72.5,
         "battery": {
@@ -47,24 +47,24 @@ def test_normalized_packet_preserves_payload_snapshot():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0002",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
     # Змінюємо початковий словник після створення пакета.
-    normalized_payload["soc_percent"] = 95.0
-    normalized_payload["battery"]["temperature_c"] = 40.0
+    ingress_payload["soc_percent"] = 95.0
+    ingress_payload["battery"]["temperature_c"] = 40.0
 
     # Збережений пакет повинен містити початкові значення.
-    assert packet.normalized_payload["soc_percent"] == 72.5
-    assert packet.normalized_payload["battery"]["temperature_c"] == 28.3
+    assert packet.ingress_payload["soc_percent"] == 72.5
+    assert packet.ingress_payload["battery"]["temperature_c"] == 28.3
 
 
-def test_normalized_packet_payload_cannot_be_modified():
-    normalized_payload = {
+def test_ingress_packet_payload_cannot_be_modified():
+    ingress_payload = {
         "asset_id": "BESS-01",
         "soc_percent": 72.5,
         "battery": {
@@ -77,22 +77,22 @@ def test_normalized_packet_payload_cannot_be_modified():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0003",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
     with pytest.raises(TypeError):
-        packet.normalized_payload["soc_percent"] = 95.0
+        packet.ingress_payload["soc_percent"] = 95.0
 
     with pytest.raises(TypeError):
-        packet.normalized_payload["battery"]["temperature_c"] = 40.0
+        packet.ingress_payload["battery"]["temperature_c"] = 40.0
 
 
 def test_to_dict_returns_independent_mutable_copy():
-    normalized_payload = {
+    ingress_payload = {
         "asset_id": "BESS-01",
         "soc_percent": 72.5,
         "battery": {
@@ -105,26 +105,26 @@ def test_to_dict_returns_independent_mutable_copy():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0004",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
     restored_payload = packet.to_dict()
 
-    assert restored_payload == normalized_payload
+    assert restored_payload == ingress_payload
 
     restored_payload["soc_percent"] = 95.0
     restored_payload["battery"]["temperature_c"] = 40.0
 
-    assert packet.normalized_payload["soc_percent"] == 72.5
-    assert packet.normalized_payload["battery"]["temperature_c"] == 28.3
+    assert packet.ingress_payload["soc_percent"] == 72.5
+    assert packet.ingress_payload["battery"]["temperature_c"] == 28.3
 
 
 def test_to_dict_returns_independent_copies():
-    normalized_payload = {
+    ingress_payload = {
         "asset_id": "BESS-01",
         "soc_percent": 72.5,
         "battery": {
@@ -137,10 +137,10 @@ def test_to_dict_returns_independent_copies():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0005",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
@@ -153,12 +153,12 @@ def test_to_dict_returns_independent_copies():
     assert payload_2["soc_percent"] == 72.5
     assert payload_2["battery"]["temperature_c"] == 28.3
 
-    assert packet.normalized_payload["soc_percent"] == 72.5
-    assert packet.normalized_payload["battery"]["temperature_c"] == 28.3
+    assert packet.ingress_payload["soc_percent"] == 72.5
+    assert packet.ingress_payload["battery"]["temperature_c"] == 28.3
 
 
 def test_freeze_and_defrost_preserve_payload_data():
-    normalized_payload = {
+    ingress_payload = {
         "asset_id": "BESS-01",
         "soc_percent": 72.5,
         "battery": {
@@ -171,19 +171,19 @@ def test_freeze_and_defrost_preserve_payload_data():
         tzinfo=timezone.utc,
     )
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0006",
         source_id="BESS-01-API",
-        normalized_payload=normalized_payload,
+        ingress_payload=ingress_payload,
         received_at_utc=received_at,
     )
 
     restored_payload = packet.to_dict()
 
-    assert restored_payload == normalized_payload
+    assert restored_payload == ingress_payload
 
-    assert restored_payload is not normalized_payload
-    assert restored_payload["battery"] is not normalized_payload["battery"]
+    assert restored_payload is not ingress_payload
+    assert restored_payload["battery"] is not ingress_payload["battery"]
 
 
 

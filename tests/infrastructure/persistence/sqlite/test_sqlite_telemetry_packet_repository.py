@@ -2,8 +2,8 @@ import pytest
 import sqlite3
 from datetime import datetime, timezone
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.infrastructure.persistence.sqlite.sqlite_telemetry_packet_repository import (
     SQLiteTelemetryPacketRepository,
@@ -15,10 +15,10 @@ def test_save_and_get_packet():
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={
+        ingress_payload={
             "timestamp": "2026-10-07T10:00:00+03:00",
             "soc_percent": 15.0,
             "power_kw": 70.0,
@@ -47,10 +47,10 @@ def test_repository_allows_saving_same_packet_again():
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={
+        ingress_payload={
             "timestamp": "2026-10-07T10:00:00+03:00",
             "soc_percent": 15.0,
             "power_kw": 70.0,
@@ -80,10 +80,10 @@ def test_repository_rejects_same_packet_id_with_different_data():
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    original_packet = NormalizedTelemetryPacket(
+    original_packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={
+        ingress_payload={
             "timestamp": "2026-10-07T10:00:00+03:00",
             "soc_percent": 15.0,
             "power_kw": 70.0,
@@ -100,10 +100,10 @@ def test_repository_rejects_same_packet_id_with_different_data():
         ),
     )
 
-    conflicting_packet = NormalizedTelemetryPacket(
+    conflicting_packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={
+        ingress_payload={
             "timestamp": "2026-10-07T10:00:00+03:00",
             "soc_percent": 15.0,
             "power_kw": 80.0,
@@ -131,10 +131,10 @@ def test_find_by_source_id_returns_only_matching_packets():
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    first_packet = NormalizedTelemetryPacket(
+    first_packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 15.0},
+        ingress_payload={"soc_percent": 15.0},
         received_at_utc=datetime(
             2026,
             10,
@@ -146,10 +146,10 @@ def test_find_by_source_id_returns_only_matching_packets():
         ),
     )
 
-    second_packet = NormalizedTelemetryPacket(
+    second_packet = IngressTelemetryPacket(
         packet_id="packet-002",
         source_id="bess-api-02",
-        normalized_payload={"soc_percent": 20.0},
+        ingress_payload={"soc_percent": 20.0},
         received_at_utc=datetime(
             2026,
             10,
@@ -161,10 +161,10 @@ def test_find_by_source_id_returns_only_matching_packets():
         ),
     )
 
-    third_packet = NormalizedTelemetryPacket(
+    third_packet = IngressTelemetryPacket(
         packet_id="packet-003",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 25.0},
+        ingress_payload={"soc_percent": 25.0},
         received_at_utc=datetime(
             2026,
             10,
@@ -193,30 +193,30 @@ def test_find_by_received_at_range_returns_only_packets_inside_range():
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    first_packet = NormalizedTelemetryPacket(
+    first_packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 15.0},
+        ingress_payload={"soc_percent": 15.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    second_packet = NormalizedTelemetryPacket(
+    second_packet = IngressTelemetryPacket(
         packet_id="packet-002",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 16.0},
+        ingress_payload={"soc_percent": 16.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 5, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    third_packet = NormalizedTelemetryPacket(
+    third_packet = IngressTelemetryPacket(
         packet_id="packet-003",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 17.0},
+        ingress_payload={"soc_percent": 17.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 10, 0,
             tzinfo=timezone.utc,
@@ -271,40 +271,40 @@ def test_find_by_source_id_and_received_at_range_returns_only_matching_packets()
 
     repository = SQLiteTelemetryPacketRepository(connection)
 
-    first_packet = NormalizedTelemetryPacket(
+    first_packet = IngressTelemetryPacket(
         packet_id="packet-001",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 15.0},
+        ingress_payload={"soc_percent": 15.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 0, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    second_packet = NormalizedTelemetryPacket(
+    second_packet = IngressTelemetryPacket(
         packet_id="packet-002",
         source_id="bess-api-02",
-        normalized_payload={"soc_percent": 16.0},
+        ingress_payload={"soc_percent": 16.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 5, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    third_packet = NormalizedTelemetryPacket(
+    third_packet = IngressTelemetryPacket(
         packet_id="packet-003",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 17.0},
+        ingress_payload={"soc_percent": 17.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 10, 0,
             tzinfo=timezone.utc,
         ),
     )
 
-    fourth_packet = NormalizedTelemetryPacket(
+    fourth_packet = IngressTelemetryPacket(
         packet_id="packet-004",
         source_id="bess-api-01",
-        normalized_payload={"soc_percent": 18.0},
+        ingress_payload={"soc_percent": 18.0},
         received_at_utc=datetime(
             2026, 10, 7, 7, 20, 0,
             tzinfo=timezone.utc,

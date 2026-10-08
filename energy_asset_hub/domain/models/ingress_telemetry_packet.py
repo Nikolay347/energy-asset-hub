@@ -30,21 +30,21 @@ def _defrost(value):
 
 
 @dataclass(frozen=True, slots=True)
-class NormalizedTelemetryPacket:
+class IngressTelemetryPacket:
     packet_id: str
     source_id: str
-    normalized_payload: dict
+    ingress_payload: dict
     received_at_utc: datetime
 
     def __post_init__(self):
         object.__setattr__(
             self,
-            "normalized_payload",
-            _freeze(self.normalized_payload),
+            "ingress_payload",
+            _freeze(self.ingress_payload),
         )
 
     def to_dict(self) -> dict:
-        return _defrost(self.normalized_payload)
+        return _defrost(self.ingress_payload)
 
 
 

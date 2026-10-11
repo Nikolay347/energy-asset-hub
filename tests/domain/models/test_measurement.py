@@ -1,7 +1,5 @@
-from datetime import datetime, timezone, timedelta
 import pytest
-
-
+from datetime import datetime, timezone, timedelta
 from energy_asset_hub.domain.models.measurement import Measurement
 
 
@@ -12,6 +10,8 @@ def test_measurement_stores_parameter_and_source():
     )
 
     measurement = Measurement(
+        packet_id="PKT-0007",
+        attempt_number=1,
         asset_id="BESS-01",
         source_id="BESS-01-API",
         parameter_name="soc_percent",
@@ -33,6 +33,8 @@ def test_measurement_rejects_naive_timestamp():
 
     with pytest.raises(ValueError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="soc_percent",
@@ -50,6 +52,8 @@ def test_measurement_rejects_non_utc_timestamp():
 
     with pytest.raises(ValueError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="soc_percent",
@@ -67,6 +71,8 @@ def test_measurement_rejects_non_numeric_value():
 
     with pytest.raises(TypeError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="soc_percent",
@@ -84,6 +90,8 @@ def test_measurement_rejects_boolean_value():
 
     with pytest.raises(TypeError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="soc_percent",
@@ -101,6 +109,8 @@ def test_measurement_rejects_nan_value():
 
     with pytest.raises(ValueError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="temperature_c",
@@ -125,6 +135,8 @@ def test_measurement_rejects_infinite_value(invalid_value):
 
     with pytest.raises(ValueError):
         Measurement(
+            packet_id="PKT-0007",
+            attempt_number=1,
             asset_id="BESS-01",
             source_id="BESS-01-API",
             parameter_name="power_kw",
@@ -132,3 +144,22 @@ def test_measurement_rejects_infinite_value(invalid_value):
             unit="kW",
             timestamp_utc=timestamp,
         )
+
+
+def test_measurement_stores_packet_traceability():
+    measurement = Measurement(
+        packet_id="PKT-0007",
+        attempt_number=2,
+        asset_id="BESS-01",
+        source_id="BESS-01-API",
+        parameter_name="power_kw",
+        value=-120.0,
+        unit="kW",
+        timestamp_utc=datetime(
+            2026, 10, 2, 9, 30,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert measurement.packet_id == "PKT-0007"
+    assert measurement.attempt_number == 2

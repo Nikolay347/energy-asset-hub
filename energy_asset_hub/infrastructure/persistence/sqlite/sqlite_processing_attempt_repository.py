@@ -22,13 +22,16 @@ class SQLiteProcessingAttemptRepository:
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS processing_attempts (
-                attempt_id TEXT PRIMARY KEY,
                 packet_id TEXT NOT NULL,
+                attempt_number INTEGER NOT NULL,
                 processed_at_utc TEXT NOT NULL,
                 status TEXT NOT NULL,
                 source_timezone_used TEXT,
-                FOREIGN KEY (packet_id)
-                    REFERENCES telemetry_packets(packet_id)
+
+PRIMARY KEY (packet_id, attempt_number),
+
+FOREIGN KEY (packet_id)
+    REFERENCES telemetry_packets(packet_id)
             )
             """
         )
@@ -37,28 +40,34 @@ class SQLiteProcessingAttemptRepository:
             """
             CREATE TABLE IF NOT EXISTS processing_attempt_diagnostics (
                 diagnostic_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                attempt_id TEXT NOT NULL,
+                packet_id TEXT NOT NULL,
+                attempt_number INTEGER NOT NULL,
                 field_name TEXT NOT NULL,
                 code TEXT NOT NULL,
                 severity TEXT NOT NULL,
                 message TEXT NOT NULL,
                 actual_value TEXT,
                 expected TEXT,
-                FOREIGN KEY (attempt_id)
-                    REFERENCES processing_attempts(attempt_id)
-            )
+
+    FOREIGN KEY (packet_id, attempt_number)
+        REFERENCES processing_attempts(packet_id, attempt_number)
+)
             """
         )
 
         self._connection.commit()
 
     def save(self, attempt: ProcessingAttempt) -> None:
-        existing_attempt = self.get(attempt.attempt_id)
+        existing_attempt = self.get(
+            packet_id=attempt.packet_id,
+            attempt_number=attempt.attempt_number,
+        )
 
         if existing_attempt is not None:
             if existing_attempt != attempt:
                 raise ValueError(
-                    f"Processing attempt with id {attempt.attempt_id!r} "
+                    f"Processing attempt for packet {attempt.packet_id!r} "
+                    f"with attempt_number={attempt.attempt_number} "
                     f"already exists with different data"
                 )
 
@@ -67,8 +76,8 @@ class SQLiteProcessingAttemptRepository:
         self._connection.execute(
             """
             INSERT INTO processing_attempts (
-                attempt_id,
                 packet_id,
+                attempt_number,
                 processed_at_utc,
                 status,
                 source_timezone_used
@@ -76,8 +85,8 @@ class SQLiteProcessingAttemptRepository:
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                attempt.attempt_id,
                 attempt.packet_id,
+                attempt.attempt_number,
                 attempt.processed_at_utc.isoformat(),
                 attempt.status.value,
                 attempt.source_timezone_used,
@@ -88,7 +97,8 @@ class SQLiteProcessingAttemptRepository:
             self._connection.execute(
                 """
                 INSERT INTO processing_attempt_diagnostics (
-                    attempt_id,
+                    packet_id,
+                    attempt_number,
                     field_name,
                     code,
                     severity,
@@ -96,10 +106,11 @@ class SQLiteProcessingAttemptRepository:
                     actual_value,
                     expected
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    attempt.attempt_id,
+                    attempt.packet_id,
+                    attempt.attempt_number,
                     issue.field_name,
                     issue.code.name,
                     issue.severity.value,
@@ -111,19 +122,20 @@ class SQLiteProcessingAttemptRepository:
 
         self._connection.commit()
 
-    def get(self, attempt_id: str) -> ProcessingAttempt | None:
+    def get(self, packet_id: str, attempt_number: int) -> ProcessingAttempt | None:
         cursor = self._connection.execute(
             """
             SELECT
-                attempt_id,
                 packet_id,
+                attempt_number,
                 processed_at_utc,
                 status,
                 source_timezone_used
             FROM processing_attempts
-            WHERE attempt_id = ?
+            WHERE packet_id = ?
+                AND attempt_number = ?
             """,
-            (attempt_id,),
+            (packet_id, attempt_number),
         )
 
         row = cursor.fetchone()
@@ -141,10 +153,11 @@ class SQLiteProcessingAttemptRepository:
                 actual_value,
                 expected
             FROM processing_attempt_diagnostics
-            WHERE attempt_id = ?
+            WHERE packet_id = ?
+                AND attempt_number = ?
             ORDER BY diagnostic_id
             """,
-            (attempt_id,),
+            (packet_id, attempt_number),
         )
 
         diagnostic_rows = diagnostics_cursor.fetchall()
@@ -162,10 +175,27 @@ class SQLiteProcessingAttemptRepository:
         )
 
         return ProcessingAttempt(
-            attempt_id=row[0],
-            packet_id=row[1],
+            packet_id=row[0],
+            attempt_number=row[1],
             processed_at_utc=datetime.fromisoformat(row[2]),
             status=ProcessingStatus(row[3]),
             diagnostics=diagnostics,
             source_timezone_used=row[4],
         )
+
+    def get_latest_attempt_number(
+            self,
+            packet_id: str,
+    ) -> int | None:
+        cursor = self._connection.execute(
+            """
+            SELECT MAX(attempt_number)
+            FROM processing_attempts
+            WHERE packet_id = ?
+            """,
+            (packet_id,),
+        )
+
+        row = cursor.fetchone()
+
+        return row[0]

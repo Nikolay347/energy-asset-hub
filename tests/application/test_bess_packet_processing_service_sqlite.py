@@ -16,9 +16,46 @@ from energy_asset_hub.integrations.bess_api.processing_service import (
 from energy_asset_hub.infrastructure.persistence.sqlite.sqlite_measurement_repository import (
     SQLiteMeasurementRepository,
 )
+from energy_asset_hub.domain.services.bess_engineering_validation_service import (
+    BessEngineeringValidationService,
+)
+from energy_asset_hub.infrastructure.persistence.sqlite.sqlite_telemetry_packet_repository import (
+    SQLiteTelemetryPacketRepository,
+)
+
+
+class NoOpBessEngineeringValidationService(
+    BessEngineeringValidationService
+):
+    def __init__(self):
+        pass
+
+    def validate_asset_operating_conditions(
+        self,
+        asset_id: str,
+        temperature_c: float,
+        soc_percent: float,
+        power_kw: float,
+    ):
+        pass
+
+
+class NoOpEngineeringValidationOutcomeRepository:
+    def save(
+        self,
+        packet_id: str,
+        attempt_number: int,
+        outcome,
+    ) -> None:
+        pass
+
 
 def test_service_persists_sequential_attempt_numbers_in_sqlite():
     connection = sqlite3.connect(":memory:")
+
+    packet_repository = SQLiteTelemetryPacketRepository(
+        connection
+    )
 
     attempt_repository = SQLiteProcessingAttemptRepository(
         connection
@@ -31,6 +68,11 @@ def test_service_persists_sequential_attempt_numbers_in_sqlite():
         attempt_repository=attempt_repository,
         measurement_repository=measurement_repository,
         processing_service=BessTelemetryProcessingService(),
+        engineering_validation_service=NoOpBessEngineeringValidationService(),
+        engineering_validation_outcome_repository=(
+            NoOpEngineeringValidationOutcomeRepository()
+        ),
+        packet_repository=packet_repository,
     )
 
     packet = IngressTelemetryPacket(
@@ -87,6 +129,10 @@ def test_service_persists_sequential_attempt_numbers_in_sqlite():
 def test_service_persists_measurements_in_sqlite():
     connection = sqlite3.connect(":memory:")
 
+    packet_repository = SQLiteTelemetryPacketRepository(
+        connection
+    )
+
     attempt_repository = SQLiteProcessingAttemptRepository(
         connection
     )
@@ -99,6 +145,11 @@ def test_service_persists_measurements_in_sqlite():
         attempt_repository=attempt_repository,
         measurement_repository=measurement_repository,
         processing_service=BessTelemetryProcessingService(),
+        engineering_validation_service=NoOpBessEngineeringValidationService(),
+        engineering_validation_outcome_repository=(
+            NoOpEngineeringValidationOutcomeRepository()
+        ),
+        packet_repository=packet_repository,
     )
 
     packet = IngressTelemetryPacket(
@@ -136,3 +187,5 @@ def test_service_persists_measurements_in_sqlite():
         )
 
         assert restored_measurement == measurement
+
+

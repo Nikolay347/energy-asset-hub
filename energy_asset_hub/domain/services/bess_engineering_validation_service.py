@@ -1,10 +1,6 @@
 from energy_asset_hub.domain.models.bess_engineering_validation_outcome import (
     BessEngineeringValidationOutcome,
 )
-from energy_asset_hub.domain.models.bess_soc_discharging_rule import (
-    BessSOCDischargingRule,
-)
-
 
 class BessEngineeringValidationService:
     def __init__(

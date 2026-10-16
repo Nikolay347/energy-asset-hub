@@ -36,6 +36,7 @@ def test_failed_processing_result_is_mapped_to_failed_attempt():
 
     attempt = mapper.map(
         packet_id="PKT-0007",
+        attempt_number=1,
         processing_result=processing_result,
         processed_at_utc=processed_at_utc,
         source_timezone_used=None,
@@ -79,6 +80,7 @@ def test_successful_processing_result_is_mapped_to_successful_attempt():
 
     attempt = mapper.map(
         packet_id="PKT-0007",
+        attempt_number=1,
         processing_result=processing_result,
         processed_at_utc=processed_at_utc,
         source_timezone_used="Europe/Kyiv",

@@ -10,6 +10,7 @@ class BessProcessingAttemptMapper:
     def map(
         self,
         packet_id: str,
+        attempt_number: int,
         processing_result,
         processed_at_utc: datetime,
         source_timezone_used: str | None,
@@ -22,6 +23,7 @@ class BessProcessingAttemptMapper:
 
         return ProcessingAttempt(
             packet_id=packet_id,
+            attempt_number=attempt_number,
             processed_at_utc=processed_at_utc,
             status=status,
             diagnostics=processing_result.validation_result.issues,

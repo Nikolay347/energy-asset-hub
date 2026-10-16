@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.domain.models.processing_attempt import ProcessingAttempt
 from energy_asset_hub.domain.models.measurement import Measurement
@@ -31,7 +31,8 @@ class BessTelemetryProcessingService:
 
     def process_packet(
         self,
-        packet: NormalizedTelemetryPacket,
+        packet: IngressTelemetryPacket,
+        attempt_number: int,
         processed_at_utc: datetime,
         source_timezone: str | None,
     ) -> BessTelemetryProcessingServiceResult:
@@ -42,6 +43,7 @@ class BessTelemetryProcessingService:
 
         attempt = self._attempt_mapper.map(
             packet_id=packet.packet_id,
+            attempt_number=attempt_number,
             processing_result=processing_result,
             processed_at_utc=processed_at_utc,
             source_timezone_used=source_timezone,
@@ -50,6 +52,8 @@ class BessTelemetryProcessingService:
         if processing_result.validation_result.is_valid:
             measurements = tuple(
                 self._measurement_mapper.map(
+                    packet_id=packet.packet_id,
+                    attempt_number=attempt_number,
                     processing_result=processing_result,
                     source_id=packet.source_id,
                 )

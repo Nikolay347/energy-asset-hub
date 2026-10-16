@@ -26,6 +26,8 @@ def test_valid_bess_payload_creates_three_measurements():
     mapper = BessMeasurementMapper()
 
     measurements = mapper.map(
+        packet_id="PKT-0007",
+        attempt_number=2,
         processing_result=processing_result,
         source_id="BESS-01-API",
     )
@@ -54,6 +56,9 @@ def test_valid_bess_payload_creates_three_measurements():
         assert measurement.source_id == "BESS-01-API"
         assert measurement.timestamp_utc == expected_timestamp
 
+    assert measurements[0].packet_id == "PKT-0007"
+    assert measurements[0].attempt_number == 2
+
 
 def test_invalid_processing_result_is_rejected():
     data = {
@@ -74,6 +79,8 @@ def test_invalid_processing_result_is_rejected():
 
     with pytest.raises(ValueError):
         mapper.map(
+            packet_id="PKT-0007",
+            attempt_number=2,
             processing_result=processing_result,
             source_id="BESS-01-API",
         )
@@ -101,6 +108,8 @@ def test_mapper_uses_validated_payload_snapshot():
     mapper = BessMeasurementMapper()
 
     measurements = mapper.map(
+        packet_id="PKT-0007",
+        attempt_number=2,
         processing_result=processing_result,
         source_id="BESS-01-API",
     )

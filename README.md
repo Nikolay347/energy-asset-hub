@@ -44,7 +44,7 @@ The project is designed to support:
 - Extension with device control capabilities.
 - Support for redundant communication channels.
 
-The functionality is being implemented incrementally.
+The functionality is being implemented iteratively.
 
 ## Current Implementation
 
@@ -62,7 +62,7 @@ The current validation includes:
 - Collecting multiple validation issues in a single pass.
 
 Validation results contain structured diagnostic information, including issue codes, 
-severity, affected fields, actual values, and expected values.
+severity, affected field, actual values, and expected values.
 
 ### Timestamp Normalization
 
@@ -120,7 +120,8 @@ It contains:
 - Electrical power.
 - Temperature.
 
-The snapshot is created only after successful payload validation and timestamp normalization.
+ValidatedBessPayload is created only after successful payload validation and successful timestamp normalization.
+The normalized UTC timestamp is stored separately in BessTelemetryProcessingResult.
 
 Subsequent modifications to the original input dictionary do not affect the validated values.
 
@@ -372,10 +373,16 @@ Their necessity will be evaluated during later development.
 Diagnostic checks should not unnecessarily interrupt telemetry acquisition from otherwise 
 operational equipment.
 
+## Development Approach
+
+This project is being developed as a hands-on learning and portfolio project, using test-driven development 
+and iterative architecture development.
+AI-assisted development is used for code review, architecture discussions, learning, and exploring implementation 
+alternatives. Design decisions and code changes are reviewed and verified as part of the development process.
+
 ## Development Status
 
 Energy Asset Hub is under active development.
-
 The current implementation provides the initial BESS telemetry processing pipeline, 
 from input validation and timestamp normalization to the creation of individual 
 measurement objects.

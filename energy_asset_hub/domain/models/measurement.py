@@ -5,6 +5,8 @@ import math
 
 @dataclass(frozen=True, slots=True)
 class Measurement:
+    packet_id: str
+    attempt_number: int
     asset_id: str
     source_id: str
     parameter_name: str

@@ -11,6 +11,7 @@ class ProcessingStatus(Enum):
 @dataclass(frozen=True, slots=True)
 class ProcessingAttempt:
     packet_id: str
+    attempt_number: int
     processed_at_utc: datetime
     status: ProcessingStatus
     diagnostics: tuple[ValidationIssue, ...] = ()

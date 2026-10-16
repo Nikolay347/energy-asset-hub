@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from energy_asset_hub.domain.models.normalized_telemetry_packet import (
-    NormalizedTelemetryPacket,
+from energy_asset_hub.domain.models.ingress_telemetry_packet import (
+    IngressTelemetryPacket,
 )
 from energy_asset_hub.domain.models.processing_attempt import (
     ProcessingStatus,
@@ -19,10 +19,10 @@ from energy_asset_hub.integrations.bess_api.telemetry_processor import (
 
 
 def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
-    packet = NormalizedTelemetryPacket(
+    packet = IngressTelemetryPacket(
         packet_id="PKT-0007",
         source_id="BESS-01-API",
-        normalized_payload={
+        ingress_payload={
             "asset_id": "BESS-01",
             "timestamp": "2026-10-02T12:30:00",
             "soc_percent": 72.5,
@@ -45,6 +45,7 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
 
     first_attempt = attempt_mapper.map(
         packet_id=packet.packet_id,
+        attempt_number=1,
         processing_result=first_result,
         processed_at_utc=datetime(
             2026, 10, 2, 9, 30, 6,
@@ -68,6 +69,7 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
 
     second_attempt = attempt_mapper.map(
         packet_id=packet.packet_id,
+        attempt_number=2,
         processing_result=second_result,
         processed_at_utc=datetime(
             2026, 10, 2, 10, 0, 0,
@@ -79,10 +81,14 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
     assert second_attempt.status is ProcessingStatus.SUCCESS
     assert second_attempt.diagnostics == ()
     assert second_attempt.source_timezone_used == "Europe/Kyiv"
+    assert first_attempt.attempt_number == 1
+    assert second_attempt.attempt_number == 2
 
     measurements = measurement_mapper.map(
         processing_result=second_result,
         source_id=packet.source_id,
+        packet_id=packet.packet_id,
+        attempt_number=2,
     )
 
     assert len(measurements) == 3
@@ -97,3 +103,7 @@ def test_packet_can_be_reprocessed_after_source_timezone_is_configured():
         == datetime(2026, 10, 2, 9, 30, tzinfo=timezone.utc)
         for measurement in measurements
     )
+
+    for measurement in measurements:
+        assert measurement.packet_id == "PKT-0007"
+        assert measurement.attempt_number == 2

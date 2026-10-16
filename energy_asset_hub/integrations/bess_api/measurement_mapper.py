@@ -15,6 +15,8 @@ class BessMeasurementMapper:
             self,
             processing_result: BessTelemetryProcessingResult,
             source_id: str,
+            packet_id: str,
+            attempt_number: int,
     ) -> list[Measurement]:
 
         if (
@@ -32,6 +34,8 @@ class BessMeasurementMapper:
 
         for parameter_name, unit in self._PARAMETER_MAPPING:
             measurement = Measurement(
+                packet_id=packet_id,
+                attempt_number=attempt_number,
                 asset_id=payload.asset_id,
                 source_id=source_id,
                 parameter_name=parameter_name,

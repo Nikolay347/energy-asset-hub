@@ -23,9 +23,9 @@ and redundant communication channels.
 Energy Asset Hub is being developed incrementally as an engineering-oriented Python 
 portfolio project.
 
-Its current implementation covers BESS telemetry validation, timestamp normalization, 
-immutable validated payload snapshots, and transformation of BESS telemetry into 
-reusable measurement objects.
+Its current implementation covers BESS telemetry validation, raw packet
+preservation, structural validation, timestamp normalization, measurement creation,
+engineering validation, processing auditability, and SQLite persistence.
 
 ## Project Goals
 
@@ -48,9 +48,52 @@ The functionality is being implemented iteratively.
 
 ## Current Implementation
 
+The current implementation provides an end-to-end BESS telemetry processing pipeline 
+with REST-based telemetry acquisition, raw packet preservation, validation, timestamp 
+normalization, measurement creation, engineering validation, audit information, and SQLite
+persistence.
+
+### REST Telemetry Acquisition
+
+BessRestTelemetryAdapter acquires one telemetry payload from a configured REST endpoint
+using HTTP GET.
+
+The production transport stack includes:
+
+- RequestsHttpClient for HTTP communication.
+- SystemUtcClock for recording the UTC reception time.
+- UuidPacketIdGenerator for generating internal packet identifiers.
+- BessRestTelemetryAdapter for creating an IngressTelemetryPacket.
+
+The REST adapter is responsible only for transport-level acquisition and creation of 
+the raw ingress packet.
+
+It does not perform structural validation, timestamp normalization, engineering validation,
+or persistence.
+
+A physical BESS device or external BESS controller providing a real REST telemetry API is not 
+yet connected. The current default telemetry URL is a placeholder configuration value.
+
+### Raw Telemetry Preservation
+
+IngressTelemetryPacket represents the original telemetry received from an external source.
+
+Raw packets are persisted before processing, including packets that later fail validation or 
+timestamp normalization.
+
+Each packet preserves:
+
+- Internal packet identifier.
+- Source identifier.
+- UTC reception timestamp.
+- Original payload.
+
+This allows the original telemetry to remain available for diagnostics, auditing, and future
+reprocessing without requesting the same data from the equipment again.
+
 ### BESS Payload Validation
 
-`BessTelemetryPayloadValidator` validates incoming telemetry payloads.
+`BessTelemetryPayloadValidator` structurally validates incoming telemetry payloads.
 
 The current validation includes:
 
@@ -66,7 +109,7 @@ severity, affected field, actual values, and expected values.
 
 ### Timestamp Normalization
 
-`TimestampNormalizer` converts timestamps into timezone-aware UTC datetime objects.
+`TimestampNormalizer` converts telemetry timestamps into timezone-aware UTC datetime objects.
 
 Supported functionality includes:
 
@@ -76,27 +119,30 @@ Supported functionality includes:
 - Rejecting ambiguous local timestamps during daylight saving time transitions.
 - Rejecting nonexistent local timestamps during daylight saving time transitions.
 
-The source timezone can be supplied by the application when the external device does not 
-include timezone information in its telemetry.
+The source timezone can be supplied by the application when the external telemetry source
+does not include timezone information in its telemetry.
 
 For example, a BESS installed in Poland can use the configured `Europe/Warsaw` timezone 
 if its timestamps represent Polish local time.
 
-The timezone configuration must reflect the device's actual clock settings, not merely 
-its geographical location.
+The configured timezone must represent the actual clock configuration of the source, not merely 
+the geographical location of the equipment.
 
 ### BESS Telemetry Processing
 
-`BessTelemetryProcessor` coordinates payload validation and timestamp normalization.
+Telemetry processing is split into two levels.
+
+`BessTelemetryProcessor` performs validation and timestamp normalization for
+a supplied BESS telemetry dictionary.
 
 It:
 
 - Validates incoming telemetry before normalization.
 - Returns structured validation results.
 - Produces a normalized UTC timestamp for successfully processed payloads.
-- Converts supported timestamp normalization exceptions into validation issues.
+- Converts supported timestamp-normalization exceptions into validation issues.
 - Avoids further processing when required validation fails.
-- Creates an immutable snapshot of successfully validated payload fields.
+- Creates an immutable ValidatedBessPayload snapshot after successful validation.
 
 The processor returns a `BessTelemetryProcessingResult` containing:
 
@@ -104,8 +150,23 @@ The processor returns a `BessTelemetryProcessingResult` containing:
 - `timestamp_utc` — the normalized UTC timestamp, or `None` if processing fails.
 - `validated_payload` — a validated payload snapshot, or `None` if processing fails.
 
-The current processor operates on supplied Python dictionaries. Communication with real 
-BESS devices is not yet implemented.
+BessTelemetryProcessingService operates one level above the processor.
+
+It accepts an IngressTelemetryPacket together with processing metadata and
+coordinates:
+
+- Calling BessTelemetryProcessor for payload validation and timestamp normalization.
+- Creating a ProcessingAttempt describing the result of that processing execution.
+- Mapping successfully validated telemetry into domain Measurement objects.
+
+A failed processing attempt therefore still produces structured diagnostic and
+audit information, while successful processing produces both a successful
+ProcessingAttempt and reusable Measurement objects.
+
+The original IngressTelemetryPacket is preserved separately by the
+application-level BessPacketProcessingService, allowing the same raw packet
+to be processed again later, for example after correcting source timezone
+configuration.
 
 ### Validated BESS Payload
 
@@ -120,8 +181,10 @@ It contains:
 - Electrical power.
 - Temperature.
 
-ValidatedBessPayload is created only after successful payload validation and successful timestamp normalization.
-The normalized UTC timestamp is stored separately in BessTelemetryProcessingResult.
+`ValidatedBessPayload` is created only after successful payload validation and successful timestamp
+normalization.
+
+The normalized UTC timestamp is stored separately in `BessTelemetryProcessingResult`.
 
 Subsequent modifications to the original input dictionary do not affect the validated values.
 
@@ -181,7 +244,8 @@ The model enforces basic data integrity:
 These checks protect the consistency of the internal measurement representation 
 regardless of the original data source.
 
-Equipment-specific physical and operational validation is planned separately.
+Equipment-specific physical and operational validation is implemented
+separately and does not belong to the generic `Measurement` invariants.
 
 ### Timezone Database Check
 
@@ -200,37 +264,436 @@ external devices.
 A missing timezone definition should not automatically prevent unrelated telemetry 
 sources from operating.
 
+### Engineering Validation
+
+Equipment-specific engineering validation is separated from generic structural
+validation and from the generic `Measurement` invariants.
+
+`BessEngineeringValidationService` resolves the effective engineering rules for
+the asset and applies `BessEngineeringValidator` to the processed BESS
+measurements.
+
+The current architecture supports:
+
+- Per-asset BESS operating limits.
+- SOC-dependent discharging rules.
+- Default fallback limits and rules.
+- External asset-specific rule repositories.
+- Resolution of effective rules for each asset.
+- Recording which source and resolution reason were used for the effective rules.
+- Preserving measurements even when engineering validation reports issues.
+
+The limits resolver and SOC discharging-rule resolver first verify that the
+asset is configured.
+
+When an external asset-specific value is available, it is used.
+
+When the external repository returns no value, or when the external repository
+is unavailable, the configured per-asset defaults are used according to the
+resolver logic.
+
+The resulting engineering-validation outcome remains separate from the
+measurements themselves. This allows measured data to be preserved even when
+the operating state violates an engineering rule.
+
+### SQLite Persistence
+
+The production persistence layer uses SQLite repositories for:
+
+- Raw ingress telemetry packets.
+- Processing attempts.
+- Measurements.
+- BESS engineering-validation outcomes.
+
+Raw `IngressTelemetryPacket` data is persisted before processing begins.
+
+This preserves the original received payload even when later structural
+validation or timestamp normalization fails.
+
+Processing attempts are stored separately from the raw packet. The same packet
+can therefore have multiple processing attempts, for example after correcting
+the source timezone or other configuration.
+
+Measurements created from successful processing are persisted independently.
+
+Engineering-validation outcomes are also persisted separately, preserving both
+the validation result and the provenance of the rules used for that validation.
+
+Together, these records provide traceability between:
+```text
+IngressTelemetryPacket
+        │
+        ├── ProcessingAttempt #1
+        ├── ProcessingAttempt #2
+        │       │
+        │       └── Measurement[]
+        │
+        └── ...
+                │
+                └── EngineeringValidationOutcome
+```
+
+### Application Orchestration
+
+`BessPacketProcessingService` is the application-layer orchestrator for one
+already-created `IngressTelemetryPacket`.
+
+It coordinates the complete internal packet-processing pipeline:
+
+1. Persist the raw IngressTelemetryPacket.
+2. Determine the next processing-attempt number.
+3. Perform structural validation and timestamp normalization through
+4. BessTelemetryProcessingService.
+5. Persist the resulting ProcessingAttempt.
+6. Persist successfully created Measurement objects.
+7. Perform BESS engineering validation when measurements are available.
+8. Persist the resulting engineering-validation outcome.
+
+Transport-specific communication is intentionally outside
+`BessPacketProcessingService`.
+
+The service does not know whether the ingress packet was obtained through REST,
+MQTT, OPC UA, or another future transport mechanism.
+
+### Production Startup
+
+Production object construction is separated from packet-processing logic.
+
+`bootstrap.py` acts as the composition root. It assembles the concrete
+production components and their dependencies, including:
+
+* BessRestTelemetryAdapter.
+* SQLite repositories.
+* BESS engineering-validation services and resolvers.
+* BessPacketProcessingService.
+* BessRuntime.
+
+`BessRuntime` is a runtime container holding the top-level components required
+for BESS telemetry acquisition and processing. It does not implement business
+processing logic itself.
+
+`main.py` provides the production startup flow.
+
+`main(settings)`:
+
+* Opens the SQLite connection.
+* Loads the default BESS limits and SOC discharging rule.
+* Creates the configured and default registries.
+* Creates the current production fallback implementations for unavailable
+* external rule repositories.
+* Calls build_bess_runtime(...) to obtain a fully assembled BessRuntime.
+* Calls run_bess_once(...) to perform one telemetry acquisition and processing
+* cycle.
+* Guarantees that the SQLite connection is closed in a finally block.
+
+run_bess_once(...) performs the outer runtime step:
+``` text
+BessRestTelemetryAdapter
+        │
+        ├── HTTP GET
+        ▼
+IngressTelemetryPacket
+        │
+        ▼
+BessPacketProcessingService
+        │
+        ▼
+existing internal processing pipeline
+```
+The application entry point is:
+
+`python -m energy_asset_hub.main`
+
+The current default telemetry URL is a placeholder configuration value.
+
+No physical BESS device or external BESS controller providing a REST telemetry
+API is currently connected.
+
+The next integration step is to run the production application against a
+controlled local REST server that emulates such an external telemetry source.
+
 ## Project Structure
 
-The Python package is organized into domain and integration layers.
+The project is organized into application, domain, integration, infrastructure,
+configuration, and startup/composition layers.
 
 ```text
 energy_asset_hub/
+├── application/
+│   └── bess_packet_processing_service.py
+│
+├── config/
+│   ├── app_settings.py
+│   └── bess_defaults.py
+│
 ├── domain/
+│   ├── configuration/
+│   │   ├── configured_bess_registry.py
+│   │   ├── default_bess_limits_registry.py
+│   │   └── default_bess_soc_discharging_rule_registry.py
+│   │
 │   ├── models/
-│   │   └── measurement.py
+│   │   ├── bess_engineering_validation_outcome.py
+│   │   ├── bess_operating_limits.py
+│   │   ├── bess_soc_discharging_rule.py
+│   │   ├── ingress_telemetry_packet.py
+│   │   ├── measurement.py
+│   │   ├── processing_attempt.py
+│   │   ├── resolved_bess_limits.py
+│   │   └── resolved_bess_soc_discharging_rule.py
+│   │
+│   ├── repositories/
+│   │   ├── bess_engineering_validation_outcome_repository.py
+│   │   ├── external_bess_limits_repository.py
+│   │   ├── external_bess_soc_discharging_rule_repository.py
+│   │   ├── ingress_telemetry_packet_repository.py
+│   │   ├── measurement_repository.py
+│   │   └── processing_attempt_repository.py
+│   │
+│   ├── services/
+│   │   ├── bess_engineering_validation_service.py
+│   │   ├── bess_limits_resolver.py
+│   │   └── bess_soc_discharging_rule_resolver.py
+│   │
 │   ├── time/
 │   │   ├── timestamp_normalizer.py
 │   │   └── timezone_database_check.py
+│   │
 │   └── validation/
+│       ├── bess_engineering_validator.py
 │       ├── enums.py
 │       ├── validation_issue.py
 │       └── validation_result.py
-└── integrations/
-    └── bess_api/
-        ├── payload_validator.py
-        ├── telemetry_processor.py
-        └── measurement_mapper.py
+│
+├── infrastructure/
+│   ├── external/
+│   │   ├── unavailable_bess_limits_repository.py
+│   │   └── unavailable_bess_soc_discharging_rule_repository.py
+│   │
+│   ├── persistence/
+│   │   └── sqlite/
+│   │       ├── sqlite_bess_engineering_validation_outcome_repository.py
+│   │       ├── sqlite_measurement_repository.py
+│   │       ├── sqlite_processing_attempt_repository.py
+│   │       └── sqlite_telemetry_packet_repository.py
+│   │
+│   └── time/
+│       └── system_utc_clock.py
+│
+├── integrations/
+│   ├── telemetry_adapter.py
+│   │
+│   └── bess_api/
+│       ├── bess_rest_telemetry_adapter.py
+│       ├── measurement_mapper.py
+│       ├── payload_validator.py
+│       ├── processing_attempt_mapper.py
+│       ├── processing_service.py
+│       ├── requests_http_client.py
+│       ├── telemetry_processor.py
+│       └── uuid_packet_id_generator.py
+│
+├── bootstrap.py
+└── main.py
 ```
 
-The `domain` package contains reusable domain models, validation structures, 
-and time-related utilities.
+### Application Layer
 
-The `integrations` package contains components specific to external data formats 
-and integration workflows.
+The `application` package contains use-case orchestration.
 
-The architecture separates equipment-specific data processing from reusable domain
-representations.
+`BessPacketProcessingService` coordinates the complete processing of one
+already-created ingress telemetry packet, including persistence, processing,
+measurement creation, engineering validation, and persistence of the resulting
+outcome.
+
+It depends on repository contracts and domain/integration services rather than
+on concrete transport or persistence implementations.
+
+### Configuration Layer
+
+The `config` package contains startup configuration values and factories.
+
+`AppSettings` defines runtime-specific settings such as:
+
+- Asset identifier.
+- Telemetry source identifier.
+- REST telemetry URL.
+- Source timezone.
+- SQLite database path.
+
+`bess_defaults.py` contains the current default BESS operating limits,
+SOC discharging rule, and helpers for constructing the corresponding
+per-asset default registries.
+
+### Domain Layer
+
+The `domain` package contains reusable business models, rules, repository
+contracts, validation logic, and time-related domain utilities.
+
+#### `domain/configuration`
+
+Contains registries describing:
+
+- Which BESS assets are configured.
+- Default operating limits per asset.
+- Default SOC-dependent discharging rules per asset.
+
+#### `domain/models`
+
+Contains domain models representing:
+
+- Raw ingress telemetry packets.
+- Measurements.
+- Processing attempts.
+- BESS operating limits.
+- SOC-dependent discharging rules.
+- Resolved rule sets and their provenance.
+- Engineering-validation outcomes.
+
+#### `domain/repositories`
+
+Contains repository contracts used by higher-level services.
+
+These contracts separate business and application logic from concrete storage
+or external-source implementations.
+
+#### `domain/services`
+
+Contains domain services responsible for:
+
+- Resolving effective BESS operating limits.
+- Resolving effective SOC discharging rules.
+- Coordinating BESS engineering validation.
+
+#### `domain/time`
+
+Contains timestamp normalization and timezone-database diagnostic utilities.
+
+#### `domain/validation`
+
+Contains generic validation structures and BESS-specific engineering validation
+rules.
+
+### Integration Layer
+
+The `integrations` package contains components responsible for adapting external
+telemetry data to the internal processing model.
+
+`TelemetryAdapter` defines the current telemetry acquisition protocol.
+
+The `bess_api` package contains the BESS REST integration and processing
+components, including:
+
+- REST telemetry acquisition.
+- HTTP-client abstraction and production implementation.
+- Internal packet-ID generation.
+- BESS payload validation.
+- Timestamp-aware telemetry processing.
+- Mapping processing results to `ProcessingAttempt`.
+- Mapping validated BESS data to `Measurement` objects.
+
+Transport acquisition remains separated from application-layer packet
+processing.
+
+### Infrastructure Layer
+
+The `infrastructure` package contains concrete technical implementations of
+domain and integration contracts.
+
+#### `infrastructure/persistence/sqlite`
+
+Contains SQLite implementations for persistence of:
+
+- Raw ingress telemetry packets.
+- Processing attempts.
+- Measurements.
+- Engineering-validation outcomes.
+
+#### `infrastructure/external`
+
+Contains the current production fallback implementations representing
+unavailable external sources of asset-specific engineering limits and rules.
+
+These implementations allow the resolver logic to fall back to configured
+per-asset defaults without changing the domain services.
+
+#### `infrastructure/time`
+
+Contains `SystemUtcClock`, the production implementation used to obtain the
+current timezone-aware UTC time.
+
+### Composition Root
+
+`bootstrap.py` is the composition root.
+
+It constructs and connects concrete production dependencies, including:
+
+- REST telemetry adapter.
+- SQLite repositories.
+- Engineering-validation resolvers and services.
+- `BessPacketProcessingService`.
+- `BessRuntime`.
+
+It performs dependency wiring only and does not implement business-processing
+logic.
+
+### Production Entry Point
+
+`main.py` contains the production startup flow.
+
+It:
+
+- Receives application settings.
+- Opens the SQLite connection.
+- Prepares configured and default BESS registries.
+- Builds the production `BessRuntime`.
+- Runs one telemetry acquisition and processing cycle.
+- Guarantees cleanup of the SQLite connection.
+
+The package can be started through:
+
+```powershell
+python -m energy_asset_hub.main
+```
+
+## Tests and Architecture Documentation
+
+The project also contains:
+```text
+tests/
+├── application/
+├── config/
+├── domain/
+├── infrastructure/
+├── integrations/
+├── test_bootstrap.py
+└── test_main.py
+
+docs/
+├── architecture/
+│   ├── class_catalog.md
+│   └── system_map.md
+└── decisions/
+    ├── ADR-001-persist-raw-packet-before-processing.md
+    ├── ADR-002-separate-structural-and-engineering-validation.md
+    ├── ADR-003-use-repository-contracts-for-persistence-boundaries.md
+    ├── ADR-004-use-default-fallback-rules-when-external-rules-are-unavailable.md
+    ├── ADR-005-record-rule-provenance-in-engineering-outcomes.md
+    ├── ADR-006-number-processing-attempts-per-packet.md
+    ├── ADR-007-preserve-measurements-when-engineering-validation-reports-issues.md
+    └── ADR-008-use-application-service-as-pipeline-orchestrator.md
+```
+The test suite mirrors the main architectural layers and includes both focused
+component tests and integration tests covering the REST-to-SQLite processing
+flow.
+
+The architecture documentation provides:
+
+- class_catalog.md — stable identifiers and responsibilities of important
+  classes and protocols.
+- system_map.md — end-to-end relationships and data flow between the main
+  architectural components.
+- ADR files — architectural decisions and their rationale.
 
 ## Installation
 
@@ -265,20 +728,55 @@ python -m pip install pytest
 
 ## Testing
 
-The project uses pytest and follows an incremental test-driven development approach.
+The project uses `pytest` for unit, integration, persistence, and startup-wiring tests.
 
-Tests cover:
+The current test suite covers:
 
-- BESS payload validation.
-- Field type validation and SOC boundary conditions.
-- Timestamp normalization and timezone-related edge cases.
-- BESS telemetry processing and error propagation.
-- Validated payload snapshot integrity.
-- Measurement domain model validation.
-- BESS measurement mapping.
-- Basic timezone database availability.
+- Domain model invariants.
+- Structural telemetry validation.
+- Timestamp normalization.
+- Timezone handling and timezone-database checks.
+- Immutable validated BESS payload snapshots.
+- BESS telemetry processing.
+- Processing-attempt creation.
+- Reprocessing of preserved packets.
+- Measurement mapping.
+- Engineering validation.
+- Engineering-rule resolution.
+- Default fallback behavior when external engineering-rule sources are missing
+  or unavailable.
+- Rule-source and resolution-reason provenance.
+- Raw ingress packet persistence.
+- Processing-attempt persistence.
+- Measurement persistence.
+- Engineering-validation outcome persistence.
+- SQLite repository behavior.
+- REST telemetry acquisition.
+- HTTP client behavior.
+- Packet ID generation.
+- Production UTC clock behavior.
+- Bootstrap/composition-root wiring.
+- Production startup flow.
+- SQLite connection cleanup.
+- REST-to-SQLite integration flow.
 
-The current test suite contains 38 passing test cases.
+The current test suite contains 195 passing test cases.
+
+Focused test groups can also be run independently.
+For example:
+```shell
+python -m pytest tests/test_main.py -v
+
+python -m pytest tests/integrations -v
+
+python -m pytest tests/infrastructure -v
+```
+
+`python -m pytest` runs pytest through the currently active Python
+interpreter, which helps ensure that the test suite uses the project's active
+virtual environment.
+The `-v` option enables verbose output.
+The `-q` option enables compact output
 
 ### Run all tests
 
@@ -314,66 +812,147 @@ python -m pytest tests/domain/models/test_measurement.py -v
 
 ## Planned Development
 
-The next development stages include:
+The core BESS telemetry processing pipeline is already implemented.
 
-1. Preserving original telemetry packets, source identifiers, reception timestamps, 
-and diagnostic results.
-2. Supporting reprocessing of stored raw packets after correcting source configuration, 
-without requesting the same telemetry again.
-3. Establishing a reliable relationship between original telemetry packets and the 
-measurements derived from them.
-4. Implementing measurement history storage and retrieval.
-5. Adding real communication interfaces for energy assets.
-6. Supporting multiple data sources and redundant communication channels.
-7. Implementing equipment-specific physical and operational validation.
-8. Extending the platform with operational analysis, monitoring, reporting, and 
-predictive maintenance capabilities.
+Current and planned development is focused on extending production integration,
+scalability, and operational capabilities.
 
-### Raw Telemetry Preservation and Reprocessing
+### Near-Term Integration Work
 
-A planned requirement is to preserve incoming telemetry packets, including packets that 
-cannot be successfully validated or normalized.
+- Run the production entry point against a controlled local REST telemetry
+  server.
+- Verify the complete production path from HTTP acquisition to SQLite
+  persistence without test doubles.
+- Replace the placeholder telemetry URL with a deployment-specific value loaded
+  from an external configuration source.
+- Add configuration loading from environment variables or another external
+  configuration mechanism.
+- Connect to a real BESS controller or external telemetry source when such an
+  interface is available.
 
-Each stored packet should retain sufficient information for diagnostics and reprocessing,
-including:
+### Transport Expansion
 
-- Original received data.
-- Data source identifier.
-- Reception timestamp (`received_at_utc`).
-- Validation and processing diagnostics.
+The current production transport is REST request/response.
 
-After correcting a source configuration, such as a missing timezone definition, the system
-should be able to reprocess previously stored telemetry without requesting the same data 
-from the equipment again.
+Future transport work may include:
 
-The original reception timestamp must be preserved during reprocessing.
+- MQTT subscription-based telemetry.
+- OPC UA industrial telemetry.
+- SQL-based telemetry sources.
+- Redundant communication channels.
 
-### Equipment-Specific Validation
+Before adding MQTT or OPC UA, the current `TelemetryAdapter` contract should be
+reviewed because subscription/stream-based transports have different runtime
+behavior from REST request/response.
 
-Future validation components will consider physical and operational requirements for 
-particular equipment types.
+All transport implementations should continue producing the same internal
+`IngressTelemetryPacket` boundary where practical.
 
-For BESS installations, these may include:
+### External Engineering Configuration
 
-- Permitted charging and discharging conditions.
-- Equipment-specific temperature limits.
-- Power and available energy relationships.
-- Consistency between related operational parameters.
+The current system supports default per-asset engineering rules and repository
+contracts for external asset-specific rules.
 
-These checks will be based on the specifications and operating constraints of the 
-relevant equipment.
+Future work may include concrete implementations for:
 
-### Clock Synchronization and Equipment Control
+- File-based engineering configuration.
+- SQL-backed engineering configuration.
+- REST-based engineering-rule services.
+- Dynamic asset-specific limits.
 
-Clock synchronization checks and automated device control are not part of the current 
-implementation.
+The existing resolver and validation pipeline should remain unchanged when
+these concrete repositories are added.
 
-Their necessity will be evaluated during later development.
+### Persistence and History
 
-Diagnostic checks should not unnecessarily interrupt telemetry acquisition from otherwise 
-operational equipment.
+SQLite persistence is currently implemented.
+
+Future persistence work may include:
+
+- Richer historical queries.
+- Operational reporting.
+- Retention policies.
+- Migration support.
+- Additional database backends.
+
+### Operational Processing
+
+Future runtime capabilities may include:
+
+- Continuous or scheduled telemetry polling.
+- Multiple BESS assets.
+- Multiple telemetry sources per asset.
+- Source-health monitoring.
+- Retry policies.
+- Communication-failure handling.
+- Stale-data detection.
+- Redundant-source selection.
+
+### Engineering Analysis
+
+Future engineering-validation capabilities may include:
+
+- Additional cross-parameter consistency rules.
+- Power-versus-available-energy checks.
+- More detailed temperature-dependent limits.
+- Charge/discharge regime validation.
+- Equipment-specific constraints from real manufacturer data.
+
+### Analytics and Predictive Maintenance
+
+Longer-term development may include:
+
+- Historical trend analysis.
+- Degradation indicators.
+- Anomaly detection.
+- Predictive maintenance.
+- Machine-learning models based on accumulated operational data.
+
+These capabilities should remain downstream of the validated and auditable
+telemetry-processing pipeline rather than replacing the engineering and data
+integrity layers.
 
 ## Development Approach
+
+The project is developed incrementally using test-driven development (TDD).
+
+The typical development cycle is:
+
+```text
+Red → Green → Refactor
+```
+This means:
+1. Add or update a focused test describing the required behavior.
+2. Run the test and confirm that it fails for the expected reason.
+3. Implement the smallest meaningful production change needed to satisfy the
+   test.
+4. Run the focused test again.
+5. Run the broader regression test suite.
+6. Refactor only when behavior is already protected by tests.
+
+Development is intentionally performed in small, reviewable steps.
+
+The project favors:
+
+- Clear separation of responsibilities.
+- Small focused classes and services.
+- Explicit dependency boundaries.
+- Repository contracts between business logic and persistence.
+- Separation of transport, application, domain, and infrastructure concerns.
+- Reusable internal models independent of external transport mechanisms.
+- Traceability of telemetry processing and engineering decisions.
+- Production-like architecture without unnecessary abstraction.
+- Tests that verify meaningful behavior rather than trivial object storage.
+
+Large refactorings are avoided unless they solve a concrete architectural or
+maintenance problem.
+
+New components are introduced only when they have a clear responsibility in
+the processing pipeline.
+
+The current architecture is expected to evolve incrementally as new transports,
+external rule sources, additional asset types, and operational capabilities are
+added.
 
 This project is being developed as a hands-on learning and portfolio project, using test-driven development 
 and iterative architecture development.
@@ -382,13 +961,44 @@ alternatives. Design decisions and code changes are reviewed and verified as par
 
 ## Development Status
 
-Energy Asset Hub is under active development.
-The current implementation provides the initial BESS telemetry processing pipeline, 
-from input validation and timestamp normalization to the creation of individual 
-measurement objects.
+The project currently implements a complete single-packet BESS telemetry
+processing pipeline from REST acquisition through engineering validation and
+SQLite persistence.
 
-The project does not yet implement live device communication, persistent measurement history,
-raw telemetry storage, or equipment control.
+Implemented capabilities include:
 
-The next development focus is preserving original telemetry packets and their reception 
-metadata to support reliable historical processing and future reprocessing workflows.
+- REST-based telemetry acquisition.
+- Raw ingress packet creation and preservation.
+- Structural payload validation.
+- Timestamp normalization to UTC.
+- Immutable validated BESS payload snapshots.
+- Processing-attempt tracking.
+- Reprocessing support for preserved packets.
+- Mapping validated telemetry to domain `Measurement` objects.
+- Equipment-specific engineering validation.
+- Default and external engineering-rule resolution.
+- Rule-source and resolution-reason provenance.
+- SQLite persistence for raw packets, attempts, measurements, and engineering
+  validation outcomes.
+- Application-layer orchestration.
+- Production dependency wiring through `bootstrap.py`.
+- Production startup through `main.py`.
+- Resource cleanup for SQLite connections.
+- Automated test coverage across domain, integration, infrastructure,
+  persistence, and startup layers.
+
+The current project does not yet include:
+
+- A connected physical BESS device or real external BESS REST telemetry source.
+- Continuous production polling.
+- MQTT or OPC UA telemetry acquisition.
+- Concrete external engineering-rule repositories backed by real files,
+  databases, or services.
+- Multi-asset runtime scheduling.
+- Production deployment configuration management.
+- Advanced reporting or dashboards.
+- Predictive-maintenance or machine-learning functionality.
+
+The next practical integration milestone is to run the production entry point
+against a controlled local REST server that emulates a real external BESS
+telemetry source and verify the complete runtime path without test doubles.

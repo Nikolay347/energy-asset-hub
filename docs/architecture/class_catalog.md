@@ -9,6 +9,7 @@ identifiers only; Python class names and import paths remain the source-code ide
 - A removed class leaves its ID reserved; do not reuse it for another class.
 - Prefixes identify architectural area:
   - `APP` — application orchestration
+  - `BOOT` — composition root / runtime assembly containers
   - `DOM` — domain models and enums
   - `REP` — repository contracts / repository-level support
   - `CFG` — domain configuration registries
@@ -25,6 +26,13 @@ identifiers only; Python class names and import paths remain the source-code ide
 | ID | Class | Path | Responsibility | Depends on / collaborates with | Main output / side effect | Status |
 |---|---|---|---|---|---|---|
 | APP-001 | `BessPacketProcessingService` | `energy_asset_hub/application/bess_packet_processing_service.py` | Orchest<br/>rates one packet through the end-to-end application pipeline. Persists raw packet before processing, assigns attempt number, invokes telemetry processing and engineering validation, then persists results. | `REP-001`, `REP-003`, `REP-004`, `REP-005`, `INT-008`, `SVC-005` | Saved raw packet, `ProcessingAttempt`, `Measurement[]`, optional `BessEngineeringValidationOutcome`; returns processing result | ✅ |
+
+## Composition root / runtime assembly
+
+| ID | Class | Path | Responsibility | Contains / collaborates with | Status |
+|---|---|---|---|---|---|
+| BOOT-001 | `BessRuntime` | `energy_asset_hub/bootstrap.py` | Runtime container for the top-level BESS components required to acquire and process telemetry. It does not implement processing logic itself. | `INT-014`, `APP-001` | ✅ |
+| BOOT-002 | `SQLiteRepositories` | `energy_asset_hub/bootstrap.py` | Groups the concrete SQLite repository implementations created from one SQLite connection and passed into application-service construction. | `SQL-001`, `SQL-002`, `SQL-003`, `SQL-004` | ✅ |
 
 ## Domain models and enums
 
@@ -57,6 +65,8 @@ identifiers only; Python class names and import paths remain the source-code ide
 | REP-007 | `ExternalBessLimitsRepositoryUnavailableError` | same file as `REP-006` | Signals external limits source is temporarily unavailable. | Handled by `SVC-001` | ✅ |
 | REP-008 | `ExternalBessSOCDischargingRuleRepository` | `domain/repositories/external_bess_soc_discharging_rule_repository.py` | Contract for optional external/asset-specific SOC discharge rule. | Used by `SVC-003` | 🟡 |
 | REP-009 | `ExternalBessSOCDischargingRuleRepositoryUnavailableError` | same file as `REP-008` | Signals external SOC-rule source is unavailable. | Handled by `SVC-003` | ✅ |
+| REP-010 | `UnavailableBessLimitsRepository` | `infrastructure/external/unavailable_bess_limits_repository.py` | Production fallback implementation representing an unavailable external source of asset-specific BESS operating limits. Raises the repository-unavailable error when queried. | Implements the role of `REP-006`; used by `SVC-001` through bootstrap/main wiring | ✅ |
+| REP-011 | `UnavailableBessSOCDischargingRuleRepository` | `infrastructure/external/unavailable_bess_soc_discharging_rule_repository.py` | Production fallback implementation representing an unavailable external source of asset-specific SOC discharging rules. Raises the repository-unavailable error when queried. | Implements the role of `REP-008`; used by `SVC-003` through bootstrap/main wiring | ✅ |
 
 ## Domain configuration registries
 
@@ -67,6 +77,8 @@ identifiers only; Python class names and import paths remain the source-code ide
 | CFG-003 | `BessDefaultLimitsNotFoundError` | same file as `CFG-002` | Signals missing default limits for requested asset. | Registry/resolver flow | ✅ |
 | CFG-004 | `DefaultBessSOCDischargingRuleRegistry` | `domain/configuration/default_bess_soc_discharging_rule_registry.py` | Provides default/fallback SOC discharge rule per asset. | `SVC-003` | ✅ |
 | CFG-005 | `BessDefaultSOCDischargingRuleNotFoundError` | same file as `CFG-004` | Signals missing default SOC discharge rule. | Registry/resolver flow | ✅ |
+| CFG-006 | AppSettings | config/app_settings.py | Immutable startup configuration containing asset identity, telemetry source, REST URL, source timezone and SQLite database path. | main() / production startup | ✅ |
+| CFG-007 | BessDefaultRegistries | config/bess_defaults.py | Groups the per-asset default limits registry and default SOC discharging-rule registry created for startup configuration. | CFG-002, CFG-004, main() | ✅ |
 
 ## Domain services / engineering resolution
 
@@ -97,11 +109,12 @@ identifiers only; Python class names and import paths remain the source-code ide
 | TIME-003 | `AmbiguousLocalTimeError` | same file as `TIME-001` | Signals DST-fold ambiguous local time. | `INT-004` handles it | ✅ |
 | TIME-004 | `NonexistentLocalTimeError` | same file as `TIME-001` | Signals local wall-clock time that does not exist due to timezone transition. | `INT-004` handles it | ✅ |
 | TIME-005 | `TimezoneDatabaseCheck` | `domain/time/timezone_database_check.py` | Checks availability of timezone database support. | Startup/environment validation tests | ✅ |
+| TIME-006 | `SystemUtcClock` | `infrastructure/time/system_utc_clock.py` | Production UTC clock returning the current timezone-aware system time. Used for transport receipt time and startup processing time. | REST adapter construction; `main()` / `run_bess_once()` | ✅ |
 
 ## BESS API integration and mapping
 
 | ID | Class | Path | Responsibility | Depends on | Output | Status |
-|---|---|---|---|---|---|---|
+|--|---|---|---|---|---|---|
 | INT-001 | `BessTelemetryPayloadValidator` | `integrations/bess_api/payload_validator.py` | Structural/schema-level validation of incoming BESS payload fields/types/basic ranges. | `VAL-002`/`VAL-003`/enums | `ValidationResult` | ✅ |
 | INT-002 | `ValidatedBessPayload` | `integrations/bess_api/telemetry_processor.py` | Typed validated payload snapshot used after structural validation/timestamp normalization. | `INT-004` | Internal processing value | ✅ |
 | INT-003 | `BessTelemetryProcessingResult` | same file as `INT-002` | Result of low-level BESS telemetry processing, including validation/normalized data. | `INT-004`, `INT-005`, `INT-006` | Internal processing result | ✅ |
@@ -110,6 +123,14 @@ identifiers only; Python class names and import paths remain the source-code ide
 | INT-006 | `BessMeasurementMapper` | `integrations/bess_api/measurement_mapper.py` | Maps successful normalized BESS processing result into traceable measurements. | `INT-003`, `DOM-004` | `list[Measurement]` | ✅ |
 | INT-007 | `BessTelemetryProcessingServiceResult` | `integrations/bess_api/processing_service.py` | Bundles `ProcessingAttempt` and generated measurements returned to application orchestration. | `INT-008` | Attempt + measurements | ✅ |
 | INT-008 | `BessTelemetryProcessingService` | `integrations/bess_api/processing_service.py` | Coordinates processor + attempt mapper + measurement mapper for one packet and attempt number. | `INT-004`, `INT-005`, `INT-006` | `INT-007` | ✅ |
+| INT-009 | `TelemetryAdapter` | `integrations/telemetry_adapter.py` | Transport-facing protocol defining the current ingress contract: obtain one `IngressTelemetryPacket`. Intended as the common boundary for telemetry acquisition implementations. | Implemented structurally by `INT-014`; consumed by runtime/startup architecture | `DOM-001` | 🟡 |
+| INT-010 | `HttpResponse` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Protocol describing the minimal HTTP response behavior required by the REST telemetry adapter: status checking and JSON decoding. | `INT-014`, HTTP client implementation | HTTP response abstraction | ✅ |
+| INT-011 | `HttpClient` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Protocol describing the minimal HTTP client capability required by the REST adapter. | `INT-014`; production implementation `INT-015` | `INT-010` | ✅ |
+| INT-012 | `Clock` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Protocol supplying the UTC receipt timestamp without coupling the REST adapter to the system clock implementation. | `INT-014`; production implementation `TIME-006` | timezone-aware UTC `datetime` | ✅ |
+| INT-013 | `PacketIdGenerator` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Protocol for generating an internal packet identifier independently of transport payload contents. | `INT-014`; production implementation `INT-016` | packet ID string | ✅ |
+| INT-014 | `BessRestTelemetryAdapter` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Acquires one BESS telemetry payload via HTTP GET, verifies HTTP success, records receipt time, generates a packet ID and creates the raw `IngressTelemetryPacket`. It does not perform structural or engineering validation. | `INT-011`, `INT-012`, `INT-013`, `DOM-001` | `DOM-001` | ✅ |
+| INT-015 | `RequestsHttpClient` | `integrations/bess_api/requests_http_client.py` | Production HTTP-client implementation backed by `requests.Session`; performs GET requests with a configured timeout. | Implements `INT-011`; used by `INT-014` | HTTP response | ✅ |
+| INT-016 | `UuidPacketIdGenerator` | `integrations/bess_api/uuid_packet_id_generator.py` | Production packet-ID generator using UUID version 4 for internally generated ingress packet identifiers. | Implements `INT-013`; used by `INT-014` | packet ID string | ✅ |
 
 ## SQLite infrastructure
 

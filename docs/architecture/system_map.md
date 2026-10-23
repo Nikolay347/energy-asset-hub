@@ -2,6 +2,111 @@
 
 This map uses the stable IDs from `class_catalog.md`.
 
+
+## Production startup and REST ingress
+
+```text
+python -m energy_asset_hub.main
+        │
+        ▼
+run_from_default_settings()
+        │
+        ▼
+build_default_app_settings()
+        │
+        ▼
+CFG-006 AppSettings
+        │
+        ▼
+main(settings)
+        │
+        ├── opens SQLite connection
+        │
+        ├── builds configured/default BESS registries
+        │
+        ├── uses unavailable external repositories as
+        │   production fallback implementations
+        │
+        ▼
+build_bess_runtime()
+        │
+        ├── INT-014 BessRestTelemetryAdapter
+        |    ├── INT-015 RequestsHttpClient
+        |    ├── TIME-006 SystemUtcClock
+        |    └── INT-016 UuidPacketIdGenerator
+        │
+        ├── BOOT-002 SQLiteRepositories
+        │      ├── SQL-001 raw packet repository
+        │      ├── SQL-002 processing-attempt repository
+        │      ├── SQL-003 measurement repository
+        │      └── SQL-004 engineering-validation outcome repository
+        │
+        ├── SVC-005 BessEngineeringValidationService
+        │
+        └── APP-001 BessPacketProcessingService
+        │
+        ▼
+BOOT-001 BessRuntime
+        │
+        ▼
+run_bess_once()
+        │
+        ├── telemetry_adapter.fetch_packet()
+        │          │
+        │          ▼
+        │      HTTP GET
+        │          │
+        │          ▼
+        │      DOM-001 IngressTelemetryPacket
+        │
+        └── packet_processing_service.process_packet(...)
+                   │
+                   ▼
+              APP-001
+        BessPacketProcessingService
+                   │
+                   ▼
+          existing packet pipeline
+```
+main() is the production startup orchestrator. It prepares the runtime
+configuration and registries, opens the SQLite connection, builds the BESS
+runtime, starts one telemetry acquisition/processing cycle, and guarantees
+that the SQLite connection is closed in a finally block.
+```text
+main(settings)
+    │
+    ├── opens SQLite connection
+    │
+    ├── loads default BESS limits and SOC rule
+    │
+    ├── creates default registries
+    │
+    ├── creates ConfiguredBessRegistry
+    │
+    ├── creates production fallback implementations
+    │   of external repositories
+    │
+    ├── calls build_bess_runtime(...)
+    │       ↓
+    │   receives a fully assembled BessRuntime
+    │
+    ├── calls run_bess_once(...)
+    │
+    └── guarantees that the SQLite connection is closed
+```
+The REST adapter is responsible only for transport-level acquisition and
+creation of IngressTelemetryPacket. Structural validation, timestamp
+normalization, engineering validation, and persistence remain downstream
+responsibilities of the existing processing pipeline.
+
+The current default telemetry URL is a placeholder configuration value.
+No physical BESS device or external BESS controller providing a REST
+telemetry API is currently connected.
+
+The next integration step is to run the production application against a
+controlled local REST server that emulates such an external telemetry source.
+
+
 ## End-to-end packet pipeline
 
 ```text

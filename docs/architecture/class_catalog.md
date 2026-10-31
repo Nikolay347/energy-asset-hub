@@ -19,6 +19,7 @@ identifiers only; Python class names and import paths remain the source-code ide
   - `INT` — BESS API integration / mapping / processing
   - `SQL` — SQLite persistence implementations
   - `TEST` — test doubles and test-only helper classes
+  - `SIM` — local equipment simulation tools
 - Status legend: `✅ active`, `🟡 partial / future extension expected`, `🧪 test-only`.
 
 ## Application
@@ -131,6 +132,27 @@ identifiers only; Python class names and import paths remain the source-code ide
 | INT-014 | `BessRestTelemetryAdapter` | `integrations/bess_api/bess_rest_telemetry_adapter.py` | Acquires one BESS telemetry payload via HTTP GET, verifies HTTP success, records receipt time, generates a packet ID and creates the raw `IngressTelemetryPacket`. It does not perform structural or engineering validation. | `INT-011`, `INT-012`, `INT-013`, `DOM-001` | `DOM-001` | ✅ |
 | INT-015 | `RequestsHttpClient` | `integrations/bess_api/requests_http_client.py` | Production HTTP-client implementation backed by `requests.Session`; performs GET requests with a configured timeout. | Implements `INT-011`; used by `INT-014` | HTTP response | ✅ |
 | INT-016 | `UuidPacketIdGenerator` | `integrations/bess_api/uuid_packet_id_generator.py` | Production packet-ID generator using UUID version 4 for internally generated ingress packet identifiers. | Implements `INT-013`; used by `INT-014` | packet ID string | ✅ |
+
+
+## Local BESS simulation tools
+
+The local Mock BESS server emulates an external HTTP telemetry source for integration testing and end-to-end demonstrations.
+The simulator is independent of the production telemetry-processing pipeline. It communicates with the platform through the existing REST telemetry adapter, allowing the simulated equipment to be replaced with a compatible real telemetry source without changing the core processing logic.
+
+| ID | Class | Path | Responsibility | Main collaborators | Status |
+|---|---|---|---|---|---|
+| SIM-001 | `BessRequestHandler` | `tools/mock_bess/server.py` | Handles HTTP GET requests, returns JSON telemetry at `/telemetry`, and responds with HTTP 404 for unsupported routes. | `BaseHTTPRequestHandler`, `HTTPServer` | Implemented |
+
+### Server startup
+
+The `run_server()` function in `tools/mock_bess/server.py` initializes the local HTTP server, starts request handling through `serve_forever()`, and ensures that the server socket is closed during shutdown.
+
+### Integration testing
+
+The simulator is covered by four tests in `tests/tools/mock_bess/test_server.py`.
+An additional end-to-end integration test, `tests/integrations/test_mock_bess_production_flow.py`, verifies the complete execution path:
+`Mock BESS → HTTP GET → REST Adapter → Packet Processing → Engineering Validation → SQLite`
+The test confirms persistence of the incoming telemetry packet, processing attempt, normalized measurements, and engineering-validation issues.
 
 ## SQLite infrastructure
 

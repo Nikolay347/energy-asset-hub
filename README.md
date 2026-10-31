@@ -71,8 +71,61 @@ the raw ingress packet.
 It does not perform structural validation, timestamp normalization, engineering validation,
 or persistence.
 
-A physical BESS device or external BESS controller providing a real REST telemetry API is not 
-yet connected. The current default telemetry URL is a placeholder configuration value.
+The current default telemetry URL is a placeholder. For a compatible external
+REST/JSON source, configure the endpoint and verify its payload contract,
+authentication, and equipment-specific settings.
+
+### Local Mock BESS Integration
+
+The project includes a standalone local HTTP mock device in
+`tools/mock_bess/server.py`. It serves a fixed sample BESS payload at
+`GET /telemetry` and acts as an external telemetry source for the existing
+`BessRestTelemetryAdapter`.
+
+The production application has been run against this server over real HTTP,
+with the resulting packet, processing attempt, measurements, and engineering
+validation outcome persisted to SQLite.
+
+The integration is covered by **five automated tests**: four focused mock-server
+tests in `tests/tools/mock_bess/test_server.py` and the end-to-end mock
+HTTP-to-SQLite integration test in
+`tests/integrations/test_mock_bess_production_flow.py`.
+
+The fixed sample (`power_kw = -120.0`) intentionally exceeds the default charge
+power limit (100 kW), confirming that successful structural processing can
+coexist with a recorded engineering validation issue.
+
+#### Run the local mock integration
+
+Start the mock device in one terminal:
+
+```powershell
+python -m tools.mock_bess.server
+```
+
+In a second terminal, run one production acquisition and processing cycle
+using a local SQLite database:
+
+```powershell
+@'
+from dataclasses import replace
+from energy_asset_hub.config.app_settings import build_default_app_settings
+from energy_asset_hub.main import main
+
+settings = replace(
+    build_default_app_settings(),
+    telemetry_url="http://127.0.0.1:8000/telemetry",
+    sqlite_path="mock_bess_run.db",
+)
+main(settings)
+'@ | python -
+```
+
+The integration test starts its own isolated mock server automatically:
+
+```powershell
+python -m pytest tests/integrations/test_mock_bess_production_flow.py -v
+```
 
 ### Raw Telemetry Preservation
 
@@ -343,11 +396,11 @@ It coordinates the complete internal packet-processing pipeline:
 1. Persist the raw IngressTelemetryPacket.
 2. Determine the next processing-attempt number.
 3. Perform structural validation and timestamp normalization through
-4. BessTelemetryProcessingService.
-5. Persist the resulting ProcessingAttempt.
-6. Persist successfully created Measurement objects.
-7. Perform BESS engineering validation when measurements are available.
-8. Persist the resulting engineering-validation outcome.
+   `BessTelemetryProcessingService`.
+4. Persist the resulting `ProcessingAttempt`.
+5. Persist successfully created `Measurement` objects.
+6. Perform BESS engineering validation when measurements are available.
+7. Persist the resulting engineering-validation outcome.
 
 Transport-specific communication is intentionally outside
 `BessPacketProcessingService`.
@@ -357,60 +410,40 @@ MQTT, OPC UA, or another future transport mechanism.
 
 ### Production Startup
 
-Production object construction is separated from packet-processing logic.
+Production startup and dependency construction are separated from telemetry processing logic.
 
-`bootstrap.py` acts as the composition root. It assembles the concrete
+energy_asset_hub/bootstrap.py serves as the composition root. It assembles the concrete 
 production components and their dependencies, including:
 
-* BessRestTelemetryAdapter.
+* REST telemetry adapter.
 * SQLite repositories.
-* BESS engineering-validation services and resolvers.
+* BESS engineering-validation services and rule resolvers.
 * BessPacketProcessingService.
 * BessRuntime.
 
-`BessRuntime` is a runtime container holding the top-level components required
-for BESS telemetry acquisition and processing. It does not implement business
-processing logic itself.
+BessRuntime holds the assembled components required for telemetry acquisition and processing. It does not implement business logic.
 
-`main.py` provides the production startup flow.
+energy_asset_hub/main.py provides the production entry point.
 
-`main(settings)`:
+The main(settings) function:
 
-* Opens the SQLite connection.
-* Loads the default BESS limits and SOC discharging rule.
-* Creates the configured and default registries.
-* Creates the current production fallback implementations for unavailable
-* external rule repositories.
-* Calls build_bess_runtime(...) to obtain a fully assembled BessRuntime.
-* Calls run_bess_once(...) to perform one telemetry acquisition and processing
-* cycle.
-* Guarantees that the SQLite connection is closed in a finally block.
+1. Opens the SQLite connection.
+2. Loads the default BESS operating limits and SOC discharging rule.
+3. Initializes the configured and default rule registries.
+4. Prepares fallback implementations for unavailable external rule repositories.
+5. Calls build_bess_runtime(...) to assemble the production runtime.
+6. Invokes run_bess_once(...) to execute one telemetry acquisition and processing cycle.
+7. Closes the SQLite connection in a finally block.
 
-run_bess_once(...) performs the outer runtime step:
-``` text
-BessRestTelemetryAdapter
-        │
-        ├── HTTP GET
-        ▼
-IngressTelemetryPacket
-        │
-        ▼
-BessPacketProcessingService
-        │
-        ▼
-existing internal processing pipeline
-```
-The application entry point is:
+run_bess_once(...) obtains an IngressTelemetryPacket through the configured telemetry 
+adapter and passes it to BessPacketProcessingService.
 
-`python -m energy_asset_hub.main`
+The application can be started with:
 
-The current default telemetry URL is a placeholder configuration value.
+python -m energy_asset_hub.main
 
-No physical BESS device or external BESS controller providing a REST telemetry
-API is currently connected.
-
-The next integration step is to run the production application against a
-controlled local REST server that emulates such an external telemetry source.
+The default telemetry URL is a placeholder and must be configured to point to an accessible 
+telemetry source. Instructions for running against the local Mock BESS server are provided in the Local Mock BESS Integration section.
 
 ## Project Structure
 
@@ -495,6 +528,11 @@ energy_asset_hub/
 │
 ├── bootstrap.py
 └── main.py
+
+tools/
+└── mock_bess/
+    ├── __init__.py
+    └── server.py
 ```
 
 ### Application Layer
@@ -639,22 +677,8 @@ logic.
 
 ### Production Entry Point
 
-`main.py` contains the production startup flow.
-
-It:
-
-- Receives application settings.
-- Opens the SQLite connection.
-- Prepares configured and default BESS registries.
-- Builds the production `BessRuntime`.
-- Runs one telemetry acquisition and processing cycle.
-- Guarantees cleanup of the SQLite connection.
-
-The package can be started through:
-
-```powershell
-python -m energy_asset_hub.main
-```
+See [Production Startup](#production-startup) for entry-point responsibilities,
+configuration, and an example run against the local mock device.
 
 ## Tests and Architecture Documentation
 
@@ -666,6 +690,10 @@ tests/
 ├── domain/
 ├── infrastructure/
 ├── integrations/
+│   └── test_mock_bess_production_flow.py
+├── tools/
+│   └── mock_bess/
+│       └── test_server.py
 ├── test_bootstrap.py
 └── test_main.py
 
@@ -758,9 +786,9 @@ The current test suite covers:
 - Bootstrap/composition-root wiring.
 - Production startup flow.
 - SQLite connection cleanup.
-- REST-to-SQLite integration flow.
+- REST-to-SQLite integration flow with a real local mock HTTP server.
 
-The current test suite contains 195 passing test cases.
+The most recent full local test run completed with **200 passing tests** (`python -m pytest -q`).
 
 Focused test groups can also be run independently.
 For example:
@@ -819,10 +847,10 @@ scalability, and operational capabilities.
 
 ### Near-Term Integration Work
 
-- Run the production entry point against a controlled local REST telemetry
-  server.
-- Verify the complete production path from HTTP acquisition to SQLite
-  persistence without test doubles.
+The local mock REST-to-SQLite integration is implemented and covered by
+automated tests. Remaining integration work includes:
+
+
 - Replace the placeholder telemetry URL with a deployment-specific value loaded
   from an external configuration source.
 - Add configuration loading from environment variables or another external
@@ -961,44 +989,15 @@ alternatives. Design decisions and code changes are reviewed and verified as par
 
 ## Development Status
 
-The project currently implements a complete single-packet BESS telemetry
-processing pipeline from REST acquisition through engineering validation and
-SQLite persistence.
+The current working prototype processes one BESS telemetry packet per
+production invocation and has been verified against a standalone local mock
+HTTP source with SQLite persistence. See [Current Implementation](#current-implementation)
+for implemented functionality, [Testing](#testing) for verification, and
+[Planned Development](#planned-development) for future work.
 
-Implemented capabilities include:
+The local mock is a fixed-response telemetry source, not yet a configurable
+simulator or browser dashboard. Connection to a physical BESS has not been
+tested; device-specific integration requires a compatible HTTP/JSON endpoint,
+payload mapping, and configuration.
 
-- REST-based telemetry acquisition.
-- Raw ingress packet creation and preservation.
-- Structural payload validation.
-- Timestamp normalization to UTC.
-- Immutable validated BESS payload snapshots.
-- Processing-attempt tracking.
-- Reprocessing support for preserved packets.
-- Mapping validated telemetry to domain `Measurement` objects.
-- Equipment-specific engineering validation.
-- Default and external engineering-rule resolution.
-- Rule-source and resolution-reason provenance.
-- SQLite persistence for raw packets, attempts, measurements, and engineering
-  validation outcomes.
-- Application-layer orchestration.
-- Production dependency wiring through `bootstrap.py`.
-- Production startup through `main.py`.
-- Resource cleanup for SQLite connections.
-- Automated test coverage across domain, integration, infrastructure,
-  persistence, and startup layers.
 
-The current project does not yet include:
-
-- A connected physical BESS device or real external BESS REST telemetry source.
-- Continuous production polling.
-- MQTT or OPC UA telemetry acquisition.
-- Concrete external engineering-rule repositories backed by real files,
-  databases, or services.
-- Multi-asset runtime scheduling.
-- Production deployment configuration management.
-- Advanced reporting or dashboards.
-- Predictive-maintenance or machine-learning functionality.
-
-The next practical integration milestone is to run the production entry point
-against a controlled local REST server that emulates a real external BESS
-telemetry source and verify the complete runtime path without test doubles.
